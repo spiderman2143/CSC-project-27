@@ -36,7 +36,7 @@ def signup():
         con = psq.connect(**db_config)
         cur = con.cursor()
         # Use parameterized queries (%s) to prevent SQL Injection
-        query = "INSERT INTO login VALUES(username, password) "
+        query = "INSERT INTO login (username, password) VALUES (%s, %s)"
         cur.execute(query, (username, password))
         con.commit()
         con.close()
