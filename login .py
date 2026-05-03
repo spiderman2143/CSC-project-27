@@ -30,8 +30,7 @@ def signup():
     try:
         con = psq.connect(**db_config)
         cur = con.cursor()
-        query = "INSERT INTO login (username, password) VALUES (%s, %s)"
-        cur.execute(query,(username,password))
+        cur.execute("INSERT INTO login (username, password) VALUES (%s, %s)",(username,password))
         con.commit()
         con.close()
         messagebox.showinfo("Success", f"Account created for {username}")
@@ -42,8 +41,7 @@ def signup():
 def checklogin(username, password):
     con = psq.connect(**db_config)
     cur = con.cursor()
-    query = "SELECT * FROM login WHERE username = %s AND password = %s"
-    cur.execute(query, (username, password))
+    cur.execute("SELECT * FROM login WHERE username = %s AND password = %s", (username, password))
     s = cur.fetchone()
     con.close()
     return s
@@ -67,12 +65,9 @@ base.geometry("300x300")
 from PIL import Image, ImageTk
 bg_image = Image.open("MOVIE.jpeg")
 bg_image = bg_image.resize((300, 300))
-
 bg_photo = ImageTk.PhotoImage(bg_image)
-
 bg_label = tkinter.Label(base, image=bg_photo)
 bg_label.place(x=0, y=0, relwidth=1, relheight=1)
-
 bg_label.image = bg_photo
 
 tkinter.Label(base, text="Username").pack(pady=(20, 0))
