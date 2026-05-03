@@ -6,7 +6,7 @@ import PIL
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '2101',
+    'password': 'charan',
     'database': 'sandhya'
 }
 
