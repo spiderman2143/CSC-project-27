@@ -61,25 +61,25 @@ init_db()
 # UI Setup
 base = tkinter.Tk()
 base.title("Secure Login")
-base.geometry("300x300")
+base.geometry("1920x1080")
 from PIL import Image, ImageTk
 bg_image = Image.open("MOVIE.jpeg")
-bg_image = bg_image.resize((300, 300))
+bg_image = bg_image.resize((1500, 1000))
 bg_photo = ImageTk.PhotoImage(bg_image)
 bg_label = tkinter.Label(base, image=bg_photo)
 bg_label.place(x=0, y=0, relwidth=1, relheight=1)
 bg_label.image = bg_photo
 
-tkinter.Label(base, text="Username").pack(pady=(20, 0))
-enteruser = tkinter.Entry(base)
+tkinter.Label(base, text="Username",width=30,font=('Arial',30),fg='navy').pack(pady=(100, 0))
+enteruser = tkinter.Entry(base,width=50,font=(30),bg='white')
 enteruser.pack()
 
-tkinter.Label(base, text="Password").pack(pady=(10, 0))
-enterpass = tkinter.Entry(base, show="*") # Hides password characters
+tkinter.Label(base, text="Password",width=30,font=('Arial',30),fg='red').pack(pady=(30, 0))
+enterpass = tkinter.Entry(base,width=50,font=(30),bg='white', show="*") # Hides password characters
 enterpass.pack()
 
-tkinter.Button(base, text="Login", command=login_action, width=15).pack(pady=20)
-tkinter.Button(base, text="Signup", command=signup, width=15).pack(pady=5)
+tkinter.Button(base, text="Login", command=login_action, width=70,font=(20),bg='grey').pack(pady=20)
+
 
 
 base.mainloop()
