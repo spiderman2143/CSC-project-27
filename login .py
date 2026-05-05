@@ -10,7 +10,7 @@ db_config = {
     'password': '2101',
     'database': 'sandhya'
 }
-
+# ---------------- USERDETAILS TABLE CREATION ----------------
 def init_db():
     con = psq.connect(**db_config)
     cur = con.cursor()
@@ -28,23 +28,23 @@ def user_signup():
     username = user_entry.get()
     password = pass_entry.get()
     confirm = confirm_entry.get()
-
+#EMPTY FIELD CHECK
     if not all([name, age, email, username, password, confirm]):
         messagebox.showerror("Error", "All fields required")
         return
-
+#AGE DIGIT CHECK
     if not age.isdigit():
         messagebox.showerror("Error", "Age must be a number")
         return
-
+#SECURE PASSWORD CHECK
     if len(password) <= 4:
         messagebox.showerror("Error", "Password must be > 4 characters")
         return
-
+#PASSWORD CONFIRMATION CHECK
     if password != confirm:
         messagebox.showerror("Error", "Passwords do not match")
         return
-
+#DATA INSERTED INTO TABLE
     try:
         con = psq.connect(**db_config)
         cur = con.cursor()
@@ -62,6 +62,7 @@ def user_signup():
         messagebox.showerror("Error", "Username already exists!")
 
 # ---------------- LOGIN ----------------
+#CHECKING THE LOGIN DETAILS
 def checklogin(username, password):
     con = psq.connect(**db_config)
     cur = con.cursor()
@@ -69,7 +70,7 @@ def checklogin(username, password):
     result = cur.fetchone()
     con.close()
     return result
-
+#CALLING FUNCTION AND DISPLAY MSG
 def login_action():
     user = enteruser.get()
     pw = enterpass.get()
@@ -86,10 +87,12 @@ base = tk.Tk()
 base.title("Login System")
 base.geometry("1200x800")
 
+
 # Background
 try:
     img = Image.open("MOVIE.jpeg")
     bg_photo = ImageTk.PhotoImage(img)
+    img = img.resize((1920, 1080)) 
 
     bg_label = tk.Label(base, image=bg_photo)
     bg_label.place(x=0, y=0, relwidth=1, relheight=1)
