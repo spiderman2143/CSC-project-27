@@ -10,6 +10,8 @@ db_config = {
     'password': '2101',
     'database': 'sandhya'
 }
+
+current_user = None
 # ---------------- USERDETAILS TABLE CREATION ----------------
 def init_db():
     con = psq.connect(**db_config)
@@ -97,6 +99,41 @@ def checklogin(username, password):
     result = cur.fetchone()
     con.close()
     return result
+
+# --- NEW: Checks if the user is in the genres table ---
+def checkiffirsttime(username):
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT * FROM usergenres WHERE username=%s", (username,))
+    result = cur.fetchone()
+    con.close()
+    
+    
+    if result is None:
+        return True
+    else:
+        return False
+
+def login_action():
+    global current_user 
+    user = enteruser.get()
+    pw = enterpass.get()
+
+    if checklogin(user, pw):
+        current_user = user 
+        
+        
+        if checkiffirsttime(user):
+            show_genre_screen()    
+        else:
+            show_dashboard_screen() 
+            
+    else:
+        messagebox.showerror("Failed", "Invalid Username or Password")
+
+
+
+
 #CALLING FUNCTION AND DISPLAY MSG
 def login_action():
     user = enteruser.get()
@@ -136,17 +173,36 @@ except:
 # ---------------- FRAME SWITCH ----------------
 def show_signup_screen():
     login_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place_forget()
     signup_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+def show_login_screen():
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place_forget()
+    login_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+def show_genre_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    dashboard_frame.place_forget()
+    genre_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+# --- NEW: Show main app ---
+def show_dashboard_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place(relx=0.5, rely=0.5, anchor='center')
+    
+    # Update the welcome text to show who is logged in
+    welcome_label.config(text=f"Welcome back, {current_user}!")
 
 def show_adminscreen():
     login_frame.place_forget()
     signup_frame.place_forget()
     admin_frame.place(relx=0.5, rely=0.5, anchor='center')
-
-def show_login_screen():
-    admin_frame.place_forget()
-    signup_frame.place_forget()
-    login_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 # ---------------- LOGIN FRAME ----------------
 login_frame = tk.Frame(base, bg='white', bd=2)
@@ -229,7 +285,54 @@ confirm_entry.pack()
 tk.Button(signup_frame, text="Register", command=user_signup).pack(pady=10)
 tk.Button(signup_frame, text="Back to Login", command=show_login_screen).pack()
 
+# ---------------- GENRE SELECTION FRAME ----------------
+genre_frame = tk.Frame(base, bg='white', bd=2)
+
+tk.Label(genre_frame, text="SELECT GENRES", font=('Arial', 30, 'bold')).pack(pady=20)
+tk.Label(genre_frame, text="Pick your top 3 favorite movie genres", font=('Arial', 15)).pack(pady=10)
+
+movie_genres = ["Action", "Sci-Fi", "Comedy", "Drama", "Horror", "Thriller", "Romance", "Animation", "Documentary"]
+genre_vars = {}
+
+checkbox_container = tk.Frame(genre_frame, bg='white')
+checkbox_container.pack(pady=10)
+
+for genre in movie_genres:
+    var = tk.IntVar()
+    genre_vars[genre] = var
+    chk = tk.Checkbutton(checkbox_container, text=genre, variable=var, bg='white', font=('Arial', 12))
+    chk.pack(anchor='w', pady=2)
+
+def submit_genres():
+    selected_genres = []
+    for genre, var in genre_vars.items():
+        if var.get() == 1:
+            selected_genres.append(genre)
+    
+    if len(selected_genres) != 3:
+        messagebox.showerror("Error", "Please select exactly 3 genres")
+    else:
+        try:
+            con = psq.connect(**db_config)
+            cur = con.cursor()
+            cur.execute(
+                "INSERT INTO user_genres (username, genre1, genre2, genre3) VALUES (%s, %s, %s, %s)",
+                (current_user, selected_genres[0], selected_genres[1], selected_genres[2])
+            )
+            con.commit()
+            con.close()
+            
+            messagebox.showinfo("Success", "Genres saved successfully!")
+            show_dashboard_screen() 
+            
+        except:
+            pass
+
+tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
+
+dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
+
+welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 # Show login first
 show_login_screen()
-
 base.mainloop()
