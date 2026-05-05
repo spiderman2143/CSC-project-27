@@ -7,16 +7,20 @@ from PIL import Image, ImageTk
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '2101',
+    'password': 'charan',
     'database': 'sandhya'
 }
 
 current_user = None
+
 # ---------------- USERDETAILS TABLE CREATION ----------------
 def init_db():
     con = psq.connect(**db_config)
     cur = con.cursor()
+    # Fixed: Added all missing tables to prevent crashes
     cur.execute("CREATE TABLE IF NOT EXISTS userdetails (fullname VARCHAR(30) NOT NULL, age INT, gender VARCHAR(10), email VARCHAR(50), username VARCHAR(50) PRIMARY KEY, password VARCHAR(20), bio VARCHAR(50))")
+    cur.execute("CREATE TABLE IF NOT EXISTS admindetails (username VARCHAR(50) PRIMARY KEY, password VARCHAR(20))")
+    cur.execute("CREATE TABLE IF NOT EXISTS usergenres (username VARCHAR(50) PRIMARY KEY, genre1 VARCHAR(20), genre2 VARCHAR(20), genre3 VARCHAR(20))")
     con.commit()
     con.close()
 
@@ -30,23 +34,25 @@ def user_signup():
     username = user_entry.get()
     password = pass_entry.get()
     confirm = confirm_entry.get()
-#EMPTY FIELD CHECK
+    
+    #EMPTY FIELD CHECK
     if not all([name, age, email, username, password, confirm]):
         messagebox.showerror("Error", "All fields required")
         return
-#AGE DIGIT CHECK
+    #AGE DIGIT CHECK
     if not age.isdigit():
         messagebox.showerror("Error", "Age must be a number")
         return
-#SECURE PASSWORD CHECK
+    #SECURE PASSWORD CHECK
     if len(password) <= 4:
         messagebox.showerror("Error", "Password must be > 4 characters")
         return
-#PASSWORD CONFIRMATION CHECK
+    #PASSWORD CONFIRMATION CHECK
     if password != confirm:
         messagebox.showerror("Error", "Passwords do not match")
         return
-#DATA INSERTED INTO TABLE
+        
+    #DATA INSERTED INTO TABLE
     try:
         con = psq.connect(**db_config)
         cur = con.cursor()
@@ -62,8 +68,8 @@ def user_signup():
 
     except psq.IntegrityError:
         messagebox.showerror("Error", "Username already exists!")
-# ---------------- ADMIN LOGIN FUNCTIONS ----------------
 
+# ---------------- ADMIN LOGIN FUNCTIONS ----------------
 def checkadmin(username, password):
     con = psq.connect(**db_config)
     cur = con.cursor()
@@ -84,7 +90,6 @@ def ADlogin_action():
         messagebox.showerror("Error", "Password must be > 4 characters")
         return
     
-
     if checkadmin(user, pw):
         messagebox.showinfo("Success", "Admin Login successful!")
     else:
@@ -108,36 +113,17 @@ def checkiffirsttime(username):
     result = cur.fetchone()
     con.close()
     
-    
     if result is None:
         return True
     else:
         return False
 
+
 def login_action():
     global current_user 
     user = enteruser.get()
     pw = enterpass.get()
-
-    if checklogin(user, pw):
-        current_user = user 
-        
-        
-        if checkiffirsttime(user):
-            show_genre_screen()    
-        else:
-            show_dashboard_screen() 
-            
-    else:
-        messagebox.showerror("Failed", "Invalid Username or Password")
-
-
-
-
-#CALLING FUNCTION AND DISPLAY MSG
-def login_action():
-    user = enteruser.get()
-    pw = enterpass.get()
+    
     #EMPTY FIELD CHECK
     if not all([user,pw]):
         messagebox.showerror("Error", "All fields required")
@@ -148,7 +134,11 @@ def login_action():
         return
 
     if checklogin(user, pw):
-        messagebox.showinfo("Success", "Login successful!")
+        current_user = user 
+        if checkiffirsttime(user):
+            show_genre_screen()    
+        else:
+            show_dashboard_screen() 
     else:
         messagebox.showerror("Failed", "Invalid Username or Password")
 
@@ -158,7 +148,6 @@ init_db()
 base = tk.Tk()
 base.title("Login System")
 base.geometry("1200x800")
-
 
 # Background
 try:
@@ -171,22 +160,26 @@ except:
     pass
 
 # ---------------- FRAME SWITCH ----------------
+
 def show_signup_screen():
     login_frame.place_forget()
     genre_frame.place_forget()
     dashboard_frame.place_forget()
+    admin_frame.place_forget()
     signup_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_login_screen():
     signup_frame.place_forget()
     genre_frame.place_forget()
     dashboard_frame.place_forget()
+    admin_frame.place_forget()
     login_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_genre_screen():
     login_frame.place_forget()
     signup_frame.place_forget()
     dashboard_frame.place_forget()
+    admin_frame.place_forget()
     genre_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 # --- NEW: Show main app ---
@@ -194,6 +187,7 @@ def show_dashboard_screen():
     login_frame.place_forget()
     signup_frame.place_forget()
     genre_frame.place_forget()
+    admin_frame.place_forget()
     dashboard_frame.place(relx=0.5, rely=0.5, anchor='center')
     
     # Update the welcome text to show who is logged in
@@ -219,6 +213,7 @@ enterpass.pack(pady=10)
 
 tk.Button(login_frame, text="Login", command=login_action).pack(pady=20)
 tk.Button(login_frame, text="Create Account", command=show_signup_screen).pack()
+tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5)
 
 #----------------ADMIN FRAME--------------
 #UI SETUP
@@ -235,8 +230,6 @@ admin_pass = tk.Entry(admin_frame, width=30, show="*")
 admin_pass.pack(pady=10)
 
 tk.Button(admin_frame, text="Login", command=ADlogin_action).pack(pady=20)
-tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5)
-
 tk.Button(admin_frame, text="Back", command=show_login_screen).pack()
 
 # ---------------- SIGNUP FRAME ----------------
@@ -315,8 +308,9 @@ def submit_genres():
         try:
             con = psq.connect(**db_config)
             cur = con.cursor()
+            # Fixed: Changed user_genres to usergenres to match the table initialization
             cur.execute(
-                "INSERT INTO user_genres (username, genre1, genre2, genre3) VALUES (%s, %s, %s, %s)",
+                "INSERT INTO usergenres (username, genre1, genre2, genre3) VALUES (%s, %s, %s, %s)",
                 (current_user, selected_genres[0], selected_genres[1], selected_genres[2])
             )
             con.commit()
@@ -325,14 +319,19 @@ def submit_genres():
             messagebox.showinfo("Success", "Genres saved successfully!")
             show_dashboard_screen() 
             
-        except:
-            pass
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Failed to save genres: {e}")
 
 tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
 
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
+# Fixed: Packed the welcome label so it's not invisible
+welcome_label.pack(pady=20)
+
 # Show login first
 show_login_screen()
+
+
 base.mainloop()
