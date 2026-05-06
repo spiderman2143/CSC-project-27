@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'charan',
+    'password': '2101',
     'database': 'sandhya'
 }
 
@@ -70,6 +70,7 @@ def user_signup():
         messagebox.showerror("Error", "Username already exists!")
 
 # ---------------- ADMIN LOGIN FUNCTIONS ----------------
+#CHECKS U,P WITH ALREADY DEFINED U,P IN TABLE
 def checkadmin(username, password):
     con = psq.connect(**db_config)
     cur = con.cursor()
@@ -135,6 +136,7 @@ def login_action():
 
     if checklogin(user, pw):
         current_user = user 
+        #CHECKFIRSTTIME RETURNS TRUE-CURRENTUSER NOT THERE IN GENRE TABLE-GOES GENRE SCREEN
         if checkiffirsttime(user):
             show_genre_screen()    
         else:
