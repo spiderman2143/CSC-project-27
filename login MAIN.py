@@ -300,8 +300,8 @@ for genre in movie_genres:
 
 def submit_genres():
     selected_genres = []
-    for genre, var in genre_vars.items():
-        if var.get() == 1:
+    for i in genre_vars:
+        if genre_vars[i] == 1:
             selected_genres.append(genre)
     
     if len(selected_genres) != 3:
