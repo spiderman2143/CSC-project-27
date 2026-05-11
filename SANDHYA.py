@@ -336,10 +336,30 @@ tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
 #-----------------------------DASHBOARD--------------------------
 
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
+# CANVAS
+canvas = tk.Canvas(dashboard_frame, width=1100, height=700)
+canvas.pack(side='left', fill='both', expand=True)
 
-welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
+# SCROLLBAR
+scrollbar = tk.Scrollbar(dashboard_frame, orient='vertical', command=canvas.yview)
+scrollbar.pack(side='right', fill='y')
+
+canvas.configure(yscrollcommand=scrollbar.set)
+
+# INNER FRAME
+inside_frame = tk.Frame(canvas, bg='white')
+
+canvas.create_window((0,0), window=inside_frame, anchor='nw')
+
+# UPDATE SCROLL REGION
+inside_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+
+welcome_label = tk.Label(inside_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 # Fixed: Packed the welcome label so it's not invisible
-welcome_label.grid(pady=20)
+welcome_label.pack(pady=20)
 movies = {
     "Action": [
         ("Leo", "Tamil"),
@@ -397,50 +417,21 @@ movies = {
 }
 row_num = 1
 
-for genre, movie_list in movies.items():
+for genre,movie_list in movies.items():#MOVIELIST IS TUPLE OF MOVIE AND LANGUAGE
 # Genre Title
-    tk.Label(
-        dashboard_frame,
-        text=genre,
-        font=('Arial', 20, 'bold'),
-        bg='black',
-        fg='white',
-        width=20
-    ).grid(row=row_num, column=0, columnspan=3, sticky='w', pady=15)
-
-    row_num += 1
-    col_num = 0
-
+    tk.Label(inside_frame,text=genre,font=('Arial',20,'bold'),bg='black',fg='white',width=20).pack(pady=15)
     for movie in movie_list:
-
         movie_name = movie[0]
         language = movie[1]
+        movie_frame = tk.Frame(inside_frame, bg='lightgrey', bd=2)
+        movie_frame.pack(padx=20, pady=10)
+        #MOVIENAME LABEL
+        tk.Label(movie_frame,text=movie_name,font=('Arial',14,'bold'),bg='lightgrey').pack(padx=20,pady=10)
+        #LANGUAGE LABEL
+        tk.Label(movie_frame,text=language,bg='lightgrey').pack()
+        #REVIEW BUTTON
+        tk.Button(movie_frame,text="add review").pack(pady=10)
 
-        movie_frame = tk.Frame(dashboard_frame, bg='lightgrey', bd=2)
-
-        movie_frame.grid(row=row_num, column=col_num, padx=20, pady=10)
-
-        tk.Label(
-            movie_frame,
-            text=movie_name,
-            font=('Arial', 14, 'bold'),
-            bg='lightgrey'
-        ).pack(padx=20, pady=10)
-
-        tk.Label(
-            movie_frame,
-            text=language,
-            bg='lightgrey'
-        ).pack()
-
-        tk.Button(
-            movie_frame,
-            text="Review"
-        ).pack(pady=10)
-
-        col_num += 1
-
-    row_num += 1
 
 # Show login first
 show_login_screen()
