@@ -304,7 +304,7 @@ def trigger_search():
     load_api_movies(query)
 
 tk.Button(search_frame, text="Search Movie", command=trigger_search).pack(side=tk.LEFT)
-tk.Button(search_frame, text="Show Trending", command=lambda: load_api_movies("")).pack(side=tk.LEFT, padx=10)
+tk.Button(search_frame, text="Show Trending", command=trigger_search).pack(side=tk.LEFT, padx=10)
 
 # Treeview to display movies
 columns = ("ID", "Title", "Release Date", "Description")
@@ -326,9 +326,7 @@ def load_api_movies(search_query=""):
     for item in movie_tree.get_children():
         movie_tree.delete(item)
         
-    if not TMDB_API_KEY:
-        messagebox.showerror("API Key Missing", "Please add your TMDb API key to the top of the script!")
-        return
+
 
     # If search query is empty, get trending movies. Otherwise, search.
     if search_query == "":
@@ -340,23 +338,23 @@ def load_api_movies(search_query=""):
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
-            results = data.get("results", [])
+            results = data.get("results")
             
             # Display up to 20 results
             for movie in results[:20]:
                 m_id = movie.get("id")
                 title = movie.get("title")
-                release = movie.get("release_date", "N/A")
+                release = movie.get("release_date")
                 
                 # Clean up description (remove line breaks)
                 desc = movie.get("overview", "No description available.").replace('\n', ' ')
                 
                 movie_tree.insert("", tk.END, values=(m_id, title, release, desc))
         else:
-            messagebox.showerror("API Error", "Failed to connect to TMDb API.")
+            pass
             
-    except Exception as e:
-        messagebox.showerror("Error", f"Could not fetch data: {e}")
+    except:
+        pass
 
 # ---------------- INITIALIZATION ----------------
 init_db()
