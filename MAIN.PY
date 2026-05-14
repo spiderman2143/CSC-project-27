@@ -295,10 +295,11 @@ welcome_label.pack(pady=10)
 # Search Bar Area
 search_frame = tk.Frame(dashboard_frame, bg='white')
 search_frame.pack(pady=10)
-
+#SEARCH BOX
 search_entry = tk.Entry(search_frame, width=40, font=('Arial', 12))
 search_entry.pack(side=tk.LEFT, padx=10)
 
+#GETS DATA FROM SEARCH BOX
 def trigger_search():
     query = search_entry.get().strip()
     load_api_movies(query)
@@ -326,8 +327,6 @@ def load_api_movies(search_query=""):
     for item in movie_tree.get_children():
         movie_tree.delete(item)
         
-
-
     # If search query is empty, get trending movies. Otherwise, search.
     if search_query == "":
         url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}"
@@ -337,8 +336,8 @@ def load_api_movies(search_query=""):
     try:
         response = requests.get(url)
         if response.status_code == 200:
-            data = response.json()
-            results = data.get("results")
+            data = response.json()#data IS A DICT. HAS REQUEST AS KEY AND LIST OF MOVIES AS VALUE
+            results = data.get("results")#results IS A LIST OF MOVIES FROM data DICT
             
             # Display up to 20 results
             for movie in results[:20]:
