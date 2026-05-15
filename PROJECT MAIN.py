@@ -12,13 +12,11 @@ TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid T
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'charan', 
+    'password': '2101', 
     'database': 'sandhya'
 }
 
 current_user = None
-
-
 
 # ---------------- DATABASE INITIALIZATION ----------------
 def init_db():
@@ -27,6 +25,8 @@ def init_db():
     cur.execute("CREATE TABLE IF NOT EXISTS userdetails (fullname VARCHAR(30) NOT NULL, age INT, gender VARCHAR(10), email VARCHAR(50), username VARCHAR(50) PRIMARY KEY, password VARCHAR(20), bio VARCHAR(50))")
     cur.execute("CREATE TABLE IF NOT EXISTS admindetails (username VARCHAR(50) PRIMARY KEY, password VARCHAR(20))")
     cur.execute("CREATE TABLE IF NOT EXISTS usergenres (username VARCHAR(50) PRIMARY KEY, genre1 VARCHAR(20), genre2 VARCHAR(20), genre3 VARCHAR(20))")
+    cur.execute("CREATE TABLE IF NOT EXISTS reviews(review_id INT AUTO_INCREMENT PRIMARY KEY,username VARCHAR(50),movie_name VARCHAR(100),"
+"story INT,screenplay INT,acting INT,direction INT,music INT,visual_effects INT,entertainment INT,avg_rating FLOAT)")
     con.commit()
     con.close()
 
@@ -185,12 +185,17 @@ def show_adminscreen():
 # ---------------- LOGIN FRAME ----------------
 login_frame = tk.Frame(base, bg='white', bd=2)
 tk.Label(login_frame, text="USER LOGIN", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+#USERNAME BOX
 tk.Label(login_frame, text="Username", font=('Arial', 15), bg='white').pack()
 enteruser = tk.Entry(login_frame, width=30)
 enteruser.pack(pady=10)
+
+#PASSWORD BOX
 tk.Label(login_frame, text="Password", font=('Arial', 15), bg='white').pack()
 enterpass = tk.Entry(login_frame, width=30, show="*")
 enterpass.pack(pady=10)
+
+#3 BUTTONS-LOGIN,SIGNUP,ADMIN
 tk.Button(login_frame, text="Login", command=login_action).pack(pady=20)
 tk.Button(login_frame, text="Create Account", command=show_signup_screen).pack()
 tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5)
@@ -198,24 +203,31 @@ tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5
 #---------------- ADMIN FRAME --------------
 admin_frame = tk.Frame(base, bg='white', bd=2)
 tk.Label(admin_frame, text="ADMIN LOGIN", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+#USERNAME BOX
 tk.Label(admin_frame, text="Username", font=('Arial', 15), bg='white').pack()
 admin_user = tk.Entry(admin_frame, width=30)
 admin_user.pack(pady=10)
+
+#PASSWORD BOX
 tk.Label(admin_frame, text="Password", font=('Arial', 15), bg='white').pack()
 admin_pass = tk.Entry(admin_frame, width=30, show="*")
 admin_pass.pack(pady=10)
+
 tk.Button(admin_frame, text="Login", command=ADlogin_action).pack(pady=20)
 tk.Button(admin_frame, text="Back", command=show_login_screen).pack()
 
 # ---------------- SIGNUP FRAME ----------------
 signup_frame = tk.Frame(base, bg='white', bd=2)
 tk.Label(signup_frame, text="SIGN UP", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+#FULLNAME BOX
 tk.Label(signup_frame, text="Full Name", bg='white').pack()
 name_entry = tk.Entry(signup_frame, width=30)
 name_entry.pack()
+#AGE BOX
 tk.Label(signup_frame, text="Age", bg='white').pack()
 age_entry = tk.Entry(signup_frame, width=30)
 age_entry.pack()
+#GENDER BOX
 tk.Label(signup_frame, text="Gender", bg='white').pack()
 gender_var = tk.StringVar(value="Male")
 frame = tk.Frame(signup_frame, bg='white')
@@ -223,21 +235,26 @@ frame.pack()
 tk.Radiobutton(frame, text="Male", variable=gender_var, value="Male", bg='white').pack(side="left")
 tk.Radiobutton(frame, text="Female", variable=gender_var, value="Female", bg='white').pack(side="left")
 tk.Radiobutton(frame, text="Other", variable=gender_var, value="Other", bg='white').pack(side="left")
+#EMAIL BOX
 tk.Label(signup_frame, text="Email", bg='white').pack()
 email_entry = tk.Entry(signup_frame, width=30)
 email_entry.pack()
+#BIO BOX
 tk.Label(signup_frame, text="Bio", bg='white').pack()
 bio_entry = tk.Entry(signup_frame, width=30)
 bio_entry.pack()
+#USERNAME BOX
 tk.Label(signup_frame, text="Username", bg='white').pack()
 user_entry = tk.Entry(signup_frame, width=30)
 user_entry.pack()
+#PASSWORD BOX
 tk.Label(signup_frame, text="Password", bg='white').pack()
 pass_entry = tk.Entry(signup_frame, width=30, show="*")
 pass_entry.pack()
 tk.Label(signup_frame, text="Confirm Password", bg='white').pack()
 confirm_entry = tk.Entry(signup_frame, width=30, show="*")
 confirm_entry.pack()
+
 tk.Button(signup_frame, text="Register", command=user_signup).pack(pady=10)
 tk.Button(signup_frame, text="Back to Login", command=show_login_screen).pack()
 
@@ -267,8 +284,7 @@ def submit_genres():
         try:
             con = psq.connect(**db_config)
             cur = con.cursor()
-            cur.execute(
-                "INSERT INTO usergenres (username, genre1, genre2, genre3) VALUES (%s, %s, %s, %s)",
+            cur.execute("INSERT INTO usergenres (username, genre1, genre2, genre3) VALUES (%s, %s, %s, %s)",
                 (current_user, selected_genres[0], selected_genres[1], selected_genres[2])
             )
             con.commit()
@@ -288,13 +304,16 @@ welcome_label.pack(pady=10)
 # Search Bar Area
 search_frame = tk.Frame(dashboard_frame, bg='white')
 search_frame.pack(pady=10)
+#SEARCH BOX
 search_entry = tk.Entry(search_frame, width=40, font=('Arial', 12))
 search_entry.pack(side=tk.LEFT, padx=10)
 
+#TO SEARCH A PARTCULAR MOVIE-Search movie button
 def trigger_search():
     query = search_entry.get().strip()
     load_api_movies(query)
 
+#TO SHOW TRENDING MOVIES GENERAL-Show trending button
 def show_trending():
     search_entry.delete(0, tk.END)
     load_api_movies("")
@@ -302,7 +321,7 @@ def show_trending():
 tk.Button(search_frame, text="Search Movie", command=trigger_search).pack(side=tk.LEFT)
 tk.Button(search_frame, text="Show Trending", command=show_trending).pack(side=tk.LEFT, padx=10)
 
-# --- Scrollable Canvas Setup ---
+# ------SCROLLBAR SETUP---------
 canvas_frame = tk.Frame(dashboard_frame, bg='white')
 canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
@@ -310,7 +329,6 @@ canvas = tk.Canvas(canvas_frame, bg='white')
 scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
 scrollable_movie_frame = tk.Frame(canvas, bg='white')
 
-#
 
 canvas.create_window((0, 0), window=scrollable_movie_frame, anchor="nw")
 canvas.configure(yscrollcommand=scrollbar.set)
@@ -318,31 +336,86 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-# Fetch movies and display them in a Grid
+#-------------REVIEW SYSTEM-----------------------
+def open_review_window(movie):
+    movie_name = movie.get("title")
+    #SIDE WINDOW review_win
+    review_win = tk.Toplevel(base)
+    review_win.title("Movie Review")
+    review_win.geometry("500x700")
+    review_win.config(bg='white')
+    #MOVIE TITLE HEADING
+    tk.Label(review_win,text=movie_name,font=('Arial', 20, 'bold'),bg='white').pack(pady=20)
+    parameters = ["Story","Screenplay","Acting","Direction","Music","Visual Effects","Entertainment"]
+
+    #DICTIONARY THAT HAS PARAMETERS:RATING IN NUMBER
+    rating_vars = {}
+
+    for param in parameters:
+        tk.Label(review_win,text=param,font=('Arial', 14),bg='white').pack() #DISPLAYS PARAMETER 
+        var = tk.IntVar() #STORES STAR VALUE AS NUMBER
+        rating_vars[param] = var 
+
+        #STAR BULIDING
+        star_frame = tk.Frame(review_win,bg='#1e1e1e',padx=10,pady=5)
+        star_frame.pack(pady=5)
+        for i in range(1, 6):
+            #INSIDE STARFRAME,TEXT IS STAR,VARIABLE VAR(NUMBER STORAGE),i VALUE FOR EACH STAR,INDICATORON REMOVES CIRCLE
+            tk.Radiobutton(star_frame,text="★",variable=var,value=i,indicatoron=0,width=3,font=('Arial', 14),bg='gold').pack(side='left', padx=2)
+
+    def save_review():
+        #GETS VALUE FROM EACH KEY IN DICT-VAR-INTVAR
+        story = rating_vars["Story"].get()
+        screenplay = rating_vars["Screenplay"].get()
+        acting = rating_vars["Acting"].get()
+        direction = rating_vars["Direction"].get()
+        music = rating_vars["Music"].get()
+        visual = rating_vars["Visual Effects"].get()
+        entertainment = rating_vars["Entertainment"].get()
+
+        total = story +screenplay +acting +direction +music +visual + entertainment
+        avg = total / 7
+
+        try:
+            con = psq.connect(**db_config)
+            cur = con.cursor()
+            cur.execute("INSERT INTO reviews(username,movie_name,story,screenplay,acting,direction,music,visual_effects,entertainment,avg_rating)"
+            "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(current_user,movie_name,story,screenplay,acting,direction,music,visual,entertainment,avg))
+            con.commit()
+            con.close()
+
+            #DISPLAYS SUCCESS MSG BY ROUNDING OFF AVG RATING TO 1 DECIMAL
+            messagebox.showinfo("Success",f"Review Saved!\nAverage Rating: {round(avg,1)} ★")
+            review_win.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Database Error", str(e))
+
+    tk.Button(review_win,text="Submit Review",font=('Arial', 14, 'bold'),bg='red',fg='white',command=save_review).pack(pady=20)
+
+# FETCH MOVIE AND DISPLAY IN GRID
 def load_api_movies(search_query=""):
-    
-    
+    #DELETES EXISTING MOVIES IN FRAME
     for widget in scrollable_movie_frame.winfo_children():
         widget.destroy()
 
-    if search_query == "":
+    if search_query == "":#EMPTY CHECK-DISPLAY WHATEVER THERE
         url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}"
-    else:
+    else:#NOT EMPTY-DISPLAY WHAT IS SEARCHED
         url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_query}"
 
     try:
         response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            results = data.get("results")
-            
+        if response.status_code == 200:#WHEN SITE RUNS AND GIVES OUTPUT-200 DEFAULT STATUS CODE
+            data = response.json()#data IS DICT WITH KEY-REQUESTS AND ENTIRE MOVIE LIST-VALUE
+            results = data.get("results")#results IS ENTIRE MOVIE LIST
             row = 0
             col = 0
-            max_columns = 4 
+            max_columns = 4 #1 LINE SHOULD CONTAIN ONLY 4 MOVIES
 
-            for movie in results[:20]:
+            for movie in results[:15]:#DISPLAY 15 MOVIES
                 title = movie.get("title")
-                poster_path = movie.get("poster_path")
+                poster_path = movie.get("poster_path")#PATH FROM API DATABASE
                 
                 movie_card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
                 movie_card.grid(row=row, column=col, padx=15, pady=15)
@@ -350,27 +423,28 @@ def load_api_movies(search_query=""):
                 if poster_path:
                     img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
                     try:
-                        img_response = requests.get(img_url)
-                        img_data = img_response.content
-                        img_data = Image.open(io.BytesIO(img_data))
-                        img_data = img_data.resize((150, 225)) 
-                        photo = ImageTk.PhotoImage(img_data)
+                        img_response = requests.get(img_url) #URL LINK
+                        img_data = img_response.content #ACTUAL IMAGE CONTENT
+                        img_data = Image.open(io.BytesIO(img_data)) #USING IO MODULE OPEN IMAGE(FILE HANDLER)
+                        img_data = img_data.resize((150, 225)) #RESIZE TO FIT WINDOW
+                        photo = ImageTk.PhotoImage(img_data) #FINAL
                         img_label = tk.Label(movie_card, image=photo, bg='white')
-                        img_label.image = photo
+                        img_label.image = photo #VARIABLE TO STORE
                         img_label.pack(pady=5, padx=5)
                     except:
                         pass
                 else:
                    pass
-
-                 
+                #TITLE CONDITION FOR BIG MOVIE NAMES
                 if len(title) > 22 :
                     title = title[:19] + "..."
-                
-                 
+            
                 tk.Label(movie_card, text=title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
-                
+                tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
+
                 col += 1
+                #3 MOVIES DISPLAYED IN 1 COLUMN-GO TO NEXT ROW
+                
                 if col >= max_columns:
                     col = 0
                     row += 1
