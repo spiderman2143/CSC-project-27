@@ -346,8 +346,8 @@ def open_review_window(movie):
     review_win.config(bg='white')
     #MOVIE TITLE HEADING
     tk.Label(review_win,text=movie_name,font=('Arial', 20, 'bold'),bg='white').pack(pady=20)
-    parameters = ["Story","Screenplay","Acting","Direction","Music","Visual Effects","Entertainment"]
 
+    parameters = ["Story","Screenplay","Acting","Direction","Music","Visual Effects","Entertainment"]
     #DICTIONARY THAT HAS PARAMETERS:RATING IN NUMBER
     rating_vars = {}
 
@@ -361,6 +361,7 @@ def open_review_window(movie):
         star_frame.pack(pady=5)
         for i in range(1, 6):
             #INSIDE STARFRAME,TEXT IS STAR,VARIABLE VAR(NUMBER STORAGE),i VALUE FOR EACH STAR,INDICATORON REMOVES CIRCLE
+            #INDICATORON REVIEWED 
             tk.Radiobutton(star_frame,text="★",variable=var,value=i,indicatoron=0,width=3,font=('Arial', 14),bg='gold').pack(side='left', padx=2)
 
     def save_review():
@@ -388,8 +389,8 @@ def open_review_window(movie):
             messagebox.showinfo("Success",f"Review Saved!\nAverage Rating: {round(avg,1)} ★")
             review_win.destroy()
 
-        except Exception as e:
-            messagebox.showerror("Database Error", str(e))
+        except:
+            pass
 
     tk.Button(review_win,text="Submit Review",font=('Arial', 14, 'bold'),bg='red',fg='white',command=save_review).pack(pady=20)
 
@@ -438,8 +439,10 @@ def load_api_movies(search_query=""):
                 #TITLE CONDITION FOR BIG MOVIE NAMES
                 if len(title) > 22 :
                     title = title[:19] + "..."
-            
+
                 tk.Label(movie_card, text=title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
+                #ADD REVIEW BUTTON
+                #LAMBDA BUTTON REVIEW
                 tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
 
                 col += 1
