@@ -394,6 +394,36 @@ def open_review_window(movie):
 
     tk.Button(review_win,text="Submit Review",font=('Arial', 14, 'bold'),bg='red',fg='white',command=save_review).pack(pady=20)
 
+#-------------MOVIE DETAILS SYSTEM-----------------------
+def open_details_window(movie):
+    # Extract details from the API dictionary
+    title = movie.get("title")
+    overview = movie.get("overview" )
+    release_date = movie.get("release_date" )
+    rating = movie.get("vote_average")
+    
+    # Create the TopLevel window
+    details_win = tk.Toplevel(base)
+    details_win.title(f"{title} - Details")
+    details_win.geometry("600x400")
+    details_win.config(bg='white')
+    
+    # Title
+    tk.Label(details_win, text=title, font=('Arial', 20, 'bold'), bg='white', wraplength=550).pack(pady=15)
+    
+    # Release Date & Rating
+    info_frame = tk.Frame(details_win, bg='white')
+    info_frame.pack(pady=5)
+    tk.Label(info_frame, text=f"Release Date: {release_date}", font=('Arial', 12, 'bold'), bg='white').pack(side=tk.LEFT, padx=20)
+    
+    
+    # Overview (Using Message for automatic text wrapping)
+    tk.Label(details_win, text="Synopsis:", font=('Arial', 14, 'bold'), bg='white').pack(pady=(15, 5))
+    tk.Message(details_win, text=overview, font=('Arial', 12), bg='white', width=550, justify=tk.CENTER).pack(pady=5)
+    
+    # Close Button
+    tk.Button(details_win, text="Close", font=('Arial', 12, 'bold'), bg='red', fg='white', command=details_win.destroy).pack(pady=20)
+
 # FETCH MOVIE AND DISPLAY IN GRID
 def load_api_movies(search_query=""):
     #DELETES EXISTING MOVIES IN FRAME
@@ -414,7 +444,7 @@ def load_api_movies(search_query=""):
             col = 0
             max_columns = 4 #1 LINE SHOULD CONTAIN ONLY 4 MOVIES
 
-            for movie in results[:15]:#DISPLAY 15 MOVIES
+            for movie in results[:10]:#DISPLAY 10 MOVIES
                 title = movie.get("title")
                 poster_path = movie.get("poster_path")#PATH FROM API DATABASE
                 
@@ -441,6 +471,10 @@ def load_api_movies(search_query=""):
                     title = title[:19] + "..."
 
                 tk.Label(movie_card, text=title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
+                
+                 #ADD SEE DETAILS BUTTON 
+                tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+
                 #ADD REVIEW BUTTON
                 #LAMBDA BUTTON REVIEW
                 tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
@@ -465,4 +499,3 @@ init_db()
 show_login_screen()
 
 base.mainloop()
-#helooooooooooooooooooo
