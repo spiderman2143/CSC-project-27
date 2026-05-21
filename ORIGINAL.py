@@ -12,7 +12,7 @@ TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid T
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'charan', 
+    'password': '2101', 
     'database': 'sandhya'
 }
 
@@ -301,7 +301,7 @@ dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 welcome_label.pack(pady=10)
 
-# Search Bar Area
+#---------------------SEARCH BAR-------------------
 search_frame = tk.Frame(dashboard_frame, bg='white')
 search_frame.pack(pady=10)
 #SEARCH BOX
@@ -318,8 +318,100 @@ def show_trending():
     search_entry.delete(0, tk.END)
     load_api_movies("")
 
+#TO SHOW RECOMMENDATION BASED ON SELECTED GENRES
+tmdb_genre_ids = {"Action": 28,"Sci-Fi": 878,"Comedy": 35,"Drama": 18,"Horror": 27,"Thriller": 53,"Romance": 10749,"Animation": 16,"Documentary": 99}
+def show_recommendations():
+    # CLEAR OLD MOVIES
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+    try:
+        # CONNECT DATABASE
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        # FETCH USER GENRES
+        cur.execute("SELECT genre1, genre2, genre3 FROM usergenres WHERE username=%s",(current_user,))
+        genres = cur.fetchone()#TUPLE CONTAINING 3 GENRES
+        genres=list(genres) #CONVERTING TO LIST
+        con.close()
+
+        #GENRE NOT FOUND
+        if genres is None:
+            messagebox.showerror("Error", "Genres not found")
+            return
+        # CONVERT GENRES TO TMDB IDS
+        genre_ids = []
+        for genre in genres: #ITERATING THRU LIST
+            if genre in tmdb_genre_ids: #CHECKING IN IDS
+                genre_ids.append(str(tmdb_genre_ids[genre])) #ADDING GENREID FOR PARTICULAR GENRE
+
+        # JOIN IDS
+        genre_string = ",".join(genre_ids)
+
+        # TMDB DISCOVER API
+        url = (f"https://api.themoviedb.org/3/discover/movie?"f"api_key={TMDB_API_KEY}"f"&with_genres={genre_string}")
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get("results")
+
+            row = 0
+            col = 0
+            max_columns = 4
+            for movie in results[:10]:
+                title = movie.get("title")
+                poster_path = movie.get("poster_path")
+
+                movie_card = tk.Frame(scrollable_movie_frame,bg='white',bd=1,relief="solid")
+                movie_card.grid(row=row,column=col,padx=15,pady=15)
+
+                # POSTER IMAGE
+                if poster_path:
+                    img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+
+                    try:
+                        img_response = requests.get(img_url)
+                        img_data = img_response.content
+                        img_data = Image.open(io.BytesIO(img_data))
+                        img_data = img_data.resize((150, 225))
+                        photo = ImageTk.PhotoImage(img_data)
+
+                        img_label = tk.Label(movie_card,image=photo,bg='white')
+                        img_label.image = photo
+                        img_label.pack(pady=5)
+
+                    except:
+                        pass
+
+                # SHORTEN LONG TITLES
+                if len(title) > 22:
+                    title = title[:19] + "..."
+
+                tk.Label(movie_card,text=title,font=('Arial', 10, 'bold'),bg='white').pack(pady=(0,5))
+                col += 1
+                if col >= max_columns:
+                    col = 0
+                    row += 1
+
+                # REVIEW BUTTON
+                tk.Button(movie_card,text="Add Review",bg='black',fg='white',cursor='hand2',command=lambda m=movie: open_review_window(m)).pack(pady=5)
+                #SEE DETAILS BUTTON 
+                tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+
+        else:
+            messagebox.showerror("API Error", "Could not fetch recommendations")
+
+    except Exception as e:
+        pass
+
+    scrollable_movie_frame.update_idletasks()
+
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+
 tk.Button(search_frame, text="Search Movie", command=trigger_search).pack(side=tk.LEFT)
 tk.Button(search_frame, text="Show Trending", command=show_trending).pack(side=tk.LEFT, padx=10)
+tk.Button(search_frame,text="Recommended For You",bg='darkblue',fg='white',command=show_recommendations).pack(side=tk.LEFT, padx=10)
 
 # ------SCROLLBAR SETUP---------
 canvas_frame = tk.Frame(dashboard_frame, bg='white')
@@ -394,6 +486,35 @@ def open_review_window(movie):
 
     tk.Button(review_win,text="Submit Review",font=('Arial', 14, 'bold'),bg='red',fg='white',command=save_review).pack(pady=20)
 
+#-------------MOVIE DETAILS SYSTEM-----------------------
+def open_details_window(movie):
+    # Extract details from the API dictionary
+    title = movie.get("title")
+    overview = movie.get("overview" )
+    release_date = movie.get("release_date" )
+    
+    # Create the TopLevel window
+    details_win = tk.Toplevel(base)
+    details_win.title(f"{title} - Details")
+    details_win.geometry("600x400")
+    details_win.config(bg='white')
+    
+    # Title
+    tk.Label(details_win, text=title, font=('Arial', 20, 'bold'), bg='white', wraplength=550).pack(pady=15)
+    
+    # Release Date & Rating
+    info_frame = tk.Frame(details_win, bg='white')
+    info_frame.pack(pady=5)
+    tk.Label(info_frame, text=f"Release Date: {release_date}", font=('Arial', 12, 'bold'), bg='white').pack(side=tk.LEFT, padx=20)
+    
+    
+    # Overview (Using Message for automatic text wrapping)
+    tk.Label(details_win, text="Synopsis:", font=('Arial', 14, 'bold'), bg='white').pack(pady=(15, 5))
+    tk.Message(details_win, text=overview, font=('Arial', 12), bg='white', width=550, justify=tk.CENTER).pack(pady=5)
+    
+    # Close Button
+    tk.Button(details_win, text="Close", font=('Arial', 12, 'bold'), bg='red', fg='white', command=details_win.destroy).pack(pady=20)
+
 # FETCH MOVIE AND DISPLAY IN GRID
 def load_api_movies(search_query=""):
     #DELETES EXISTING MOVIES IN FRAME
@@ -414,7 +535,7 @@ def load_api_movies(search_query=""):
             col = 0
             max_columns = 4 #1 LINE SHOULD CONTAIN ONLY 4 MOVIES
 
-            for movie in results[:15]:#DISPLAY 15 MOVIES
+            for movie in results[:10]:#DISPLAY 10 MOVIES
                 title = movie.get("title")
                 poster_path = movie.get("poster_path")#PATH FROM API DATABASE
                 
@@ -441,16 +562,17 @@ def load_api_movies(search_query=""):
                     title = title[:19] + "..."
 
                 tk.Label(movie_card, text=title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
-                #ADD REVIEW BUTTON
-                #LAMBDA BUTTON REVIEW
-                tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
-
                 col += 1
-                #3 MOVIES DISPLAYED IN 1 COLUMN-GO TO NEXT ROW
-                
                 if col >= max_columns:
                     col = 0
                     row += 1
+                
+                 #SEE DETAILS BUTTON 
+                tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+
+                #ADD REVIEW BUTTON
+                #LAMBDA BUTTON REVIEW
+                tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
                     
     except :
         pass
@@ -465,4 +587,3 @@ init_db()
 show_login_screen()
 
 base.mainloop()
-#helooooooooooooooooooo
