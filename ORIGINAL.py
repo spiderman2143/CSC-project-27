@@ -80,7 +80,7 @@ def checkadmin(username, password):
     cur.execute("SELECT * FROM admindetails WHERE username=%s AND password=%s", (username, password))
     result = cur.fetchone()
     con.close()
-    return result
+    return result 
 
 #FACILITATES ADMINLOGIN PROCESS
 def ADlogin_action():
@@ -116,7 +116,7 @@ def checkiffirsttime(username):
     cur.execute("SELECT * FROM usergenres WHERE username=%s", (username,))
     result = cur.fetchone()
     con.close()
-    return result is None
+    return result
 
 #FACILITATES USERLOGIN PROCESS
 def login_action():
@@ -134,10 +134,10 @@ def login_action():
 
     if checklogin(user, pw):
         current_user = user 
-        if checkiffirsttime(user): #IF LOGIN FIRST TIME-MAKES THE USER SELECT GENRES
-            show_genre_screen()    
+        if checkiffirsttime(user): #IF RESULT IS TRUE-GENRES ALREADY SELECTED-GO TO DASHBOARD
+            show_dashboard_screen()    
         else:
-            show_dashboard_screen() #ELSE GOES TO DASHBOARD
+            show_genre_screen()  #RESULT IS FALSE-GENRES NOT SELECTED-GO TO GENRE SCREEN
     else:
         messagebox.showerror("Failed", "Invalid Username or Password")
 
@@ -321,12 +321,12 @@ def submit_genres():
             con.close()
             messagebox.showinfo("Success", "Genres saved successfully!")
             show_dashboard_screen() 
-        except Exception as e:
-            messagebox.showerror("Database Error", f"Failed to save genres: {e}")
+        except:
+            pass
 
 tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
 
-# ---------------- DASHBOARD & API INTEGRATION ----------------
+# ---------------- DASHBOARD ----------------
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 welcome_label.pack(pady=10)
@@ -364,14 +364,9 @@ def show_recommendations():
         genres=list(genres) #CONVERTING TO LIST
         con.close()
 
-        #GENRE NOT FOUND
-        if genres is None:
-            messagebox.showerror("Error", "Genres not found")
-            return
         #CONVERT GENRES TO TMDB IDS
         genre_ids = []
         for genre in genres: #ITERATING THRU LIST
-            if genre in tmdb_genre_ids: #CHECKING IN IDS
                 genre_ids.append(str(tmdb_genre_ids[genre])) #ADDING GENREID FOR PARTICULAR GENRE
 
         # JOIN IDS-FORMAT NEEDED FOR TMDB
@@ -395,22 +390,20 @@ def show_recommendations():
                 movie_card = tk.Frame(scrollable_movie_frame,bg='white',bd=1,relief="solid")
                 movie_card.grid(row=row,column=col,padx=15,pady=15)
 
-                # POSTER IMAGE
-                if poster_path:
-                    img_url = f"https://image.tmdb.org/t/p/w200{poster_path}" 
+                img_url = f"https://image.tmdb.org/t/p/w200{poster_path}" 
 
-                    try:
-                        img_response = requests.get(img_url) #URL LINK
-                        img_data = img_response.content #ACTUAL IMAGE CONTENT
-                        img_data = Image.open(io.BytesIO(img_data)) #USING IO MODULE OPEN IMAGE(FILE HANDLER)
-                        img_data = img_data.resize((150, 225)) #RESIZE TO FIT WINDOW
-                        photo = ImageTk.PhotoImage(img_data) #FINAL
+                try:
+                    img_response = requests.get(img_url) #URL LINK
+                    img_data = img_response.content #ACTUAL IMAGE CONTENT
+                    img_data = Image.open(io.BytesIO(img_data)) #USING IO MODULE OPEN IMAGE(FILE HANDLER)
+                    img_data = img_data.resize((150, 225)) #RESIZE TO FIT WINDOW
+                    photo = ImageTk.PhotoImage(img_data) #FINAL
 
-                        img_label = tk.Label(movie_card,image=photo,bg='white')
-                        img_label.image = photo #VARIABLE TO STORE
-                        img_label.pack(pady=5)
+                    img_label = tk.Label(movie_card,image=photo,bg='white')
+                    img_label.image = photo #VARIABLE TO STORE
+                    img_label.pack(pady=5)
 
-                    except:
+                except:
                         pass
 
                 #TITLE CONDITION FOR BIG MOVIE NAMES
@@ -428,9 +421,6 @@ def show_recommendations():
                 #SEE DETAILS BUTTON 
                 tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
 
-        else:
-            messagebox.showerror("API Error", "Could not fetch recommendations")
-
     except Exception as e:
         pass
 
@@ -443,18 +433,19 @@ tk.Button(search_frame, text="Show Trending", command=show_trending).pack(side=t
 tk.Button(search_frame,text="Recommended For You",bg='darkblue',fg='white',command=show_recommendations).pack(side=tk.LEFT, padx=10)
 
 # ------SCROLLBAR SETUP---------
+#FRAME CREATION
 canvas_frame = tk.Frame(dashboard_frame, bg='white')
 canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
 canvas = tk.Canvas(canvas_frame, bg='white')
-scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
+scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)#SCROLL VERTICALLY(YVIEW)
 scrollable_movie_frame = tk.Frame(canvas, bg='white')
 
-canvas.create_window((0, 0), window=scrollable_movie_frame, anchor="nw")
+canvas.create_window((0, 0), window=scrollable_movie_frame, anchor="nw") #AS WE SCROLL DOWN-FRAME GETS CREATED
 canvas.configure(yscrollcommand=scrollbar.set)
 
 canvas.pack(side="left", fill="both", expand=True)
-scrollbar.pack(side="right", fill="y")
+scrollbar.pack(side="right", fill="y") #TOWARDS THE EXTREME RIGHT OF PAGE
 
 #-------------REVIEW SYSTEM-----------------------
 def open_review_window(movie):
@@ -481,7 +472,6 @@ def open_review_window(movie):
         star_frame.pack(pady=5)
         for i in range(1, 6):
             #INSIDE STARFRAME,TEXT IS STAR,VARIABLE VAR(NUMBER STORAGE),i VALUE FOR EACH STAR,INDICATORON REMOVES CIRCLE
-            #INDICATORON REVIEW!!!!!!!!!!
             tk.Radiobutton(star_frame,text="★",variable=var,value=i,indicatoron=0,width=3,font=('Arial', 14),bg='gold').pack(side='left', padx=2)
 
     def save_review():
@@ -600,7 +590,6 @@ def load_api_movies(search_query=""):
                 tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
 
                 #ADD REVIEW BUTTON
-                #LAMBDA BUTTON REVIEW
                 tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
                     
     except :
