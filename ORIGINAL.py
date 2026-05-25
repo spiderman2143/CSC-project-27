@@ -330,6 +330,8 @@ tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 welcome_label.pack(pady=10)
+profile_btn = tk.Button(dashboard_frame,text="👤 Profile",font=('Arial', 11, 'bold'),bg='black',fg='white',cursor='hand2',command=lambda: open_profile_window())
+profile_btn.place(relx=0.95, rely=0.02, anchor='ne')
 
 #---------------------SEARCH BAR-------------------
 search_frame = tk.Frame(dashboard_frame, bg='white')
@@ -600,7 +602,87 @@ def load_api_movies(search_query=""):
     scrollable_movie_frame.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
 
+#----------------------USER PROFILE--------------------------------------
+def open_profile_window():
+    #CREATING SIDE WINDOWN
+    profile_win = tk.Toplevel(base)
+    profile_win.title("User Profile")
+    profile_win.geometry("500x650")
+    profile_win.config(bg='white')
+
+    # DATABASE CONNECTION
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+
+    # FETCH USERDETAILS TABLE-DATA
+    cur.execute("SELECT * FROM userdetails WHERE username=%s",(current_user,))
+    user_data = cur.fetchone() #TUPLE
+
+    # FETCH GENRES FROM TABLE
+    cur.execute("SELECT genre1, genre2, genre3 FROM usergenres WHERE username=%s",(current_user,))
+    genre_data = cur.fetchone() #TUPLE
+    con.close()
+
+    # USERDETAILS VALUES(INDEXING AND ASSIGNING)
+    fullname = user_data[0]
+    age = user_data[1]
+    gender = user_data[2]
+    email = user_data[3]
+    username = user_data[4]
+    password = user_data[5]
+    bio = user_data[6]
+
+    # GENRES (INDEXING AND ASSIGNING)
+    genre1 = genre_data[0]
+    genre2 = genre_data[1]
+    genre3 = genre_data[2]
+
+    # ---------------- TITLE ----------------
+    tk.Label(profile_win,text="👤 USER PROFILE",font=('Arial', 24, 'bold'),bg='white',fg='black').pack(pady=20)
+
+    # ---------------- PROFILE FRAME----------------
+    profile_frame = tk.Frame(profile_win,bg='lightgrey',bd=2,relief='solid',padx=20,pady=20)
+    profile_frame.pack(pady=10, padx=20, fill='both', expand=True)
+
+    # FULL NAME
+    tk.Label(profile_frame,text=f"Full Name : {fullname}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    
+    # AGE
+    tk.Label(profile_frame,text=f"Age : {age}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # GENDER
+    tk.Label(profile_frame,text=f"Gender : {gender}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # EMAIL
+    tk.Label(profile_frame,text=f"Email : {email}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # USERNAME
+    tk.Label(profile_frame,text=f"Username : {username}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # PASSWORD
+    tk.Label(profile_frame,text=f"Password : {password}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # BIO
+    tk.Label(profile_frame,text=f"Bio : {bio}",font=('Arial', 14),bg='lightgrey',anchor='w',wraplength=350,justify='left').pack(fill='x', pady=8)
+
+    # FAVORITE GENRES TITLE
+    tk.Label(profile_frame,text="Favorite Genres",font=('Arial', 16, 'bold'),bg='lightgrey').pack(pady=15)
+
+    # GENRE 1
+    tk.Label(profile_frame,text=f"• {genre1}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+
+    # GENRE 2
+    tk.Label(profile_frame,text=f"• {genre2}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+
+    # GENRE 3
+    tk.Label(profile_frame,text=f"• {genre3}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+
+    # CLOSE BUTTON
+    tk.Button(profile_win,text="Close",font=('Arial', 12, 'bold'),bg='black',fg='white',command=profile_win.destroy).pack(pady=20)
+
 # ---------------- INITIALIZATION ----------------
 init_db()
 show_login_screen()
 base.mainloop()
+
+#SHOW PASSWORD-USER PROFILE
