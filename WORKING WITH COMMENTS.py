@@ -57,7 +57,7 @@ def user_signup():
     if password != confirm:
         messagebox.showerror("Error", "Passwords do not match")
         return
-    #INSERTING INTO SQL TABLE    
+    #INSERTING INTO SQL TABLE  
     try:
         con = psq.connect(**db_config)
         cur = con.cursor()
@@ -162,6 +162,7 @@ def show_signup_screen():
     genre_frame.place_forget()
     dashboard_frame.place_forget()
     admin_frame.place_forget()
+    profile_frame.place_forget()
     signup_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_login_screen():
@@ -169,6 +170,7 @@ def show_login_screen():
     genre_frame.place_forget()
     dashboard_frame.place_forget()
     admin_frame.place_forget()
+    profile_frame.place_forget()
     login_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_adminscreen():
@@ -176,6 +178,7 @@ def show_adminscreen():
     signup_frame.place_forget()
     genre_frame.place_forget()
     dashboard_frame.place_forget()
+    profile_frame.place_forget()
     admin_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_genre_screen():
@@ -183,6 +186,7 @@ def show_genre_screen():
     signup_frame.place_forget()
     dashboard_frame.place_forget()
     admin_frame.place_forget()
+    profile_frame.place_forget()
     genre_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_dashboard_screen():
@@ -190,9 +194,19 @@ def show_dashboard_screen():
     signup_frame.place_forget()
     genre_frame.place_forget()
     admin_frame.place_forget()
+    profile_frame.place_forget()
     dashboard_frame.place(relx=0.5, rely=0.5, anchor='center')
     welcome_label.config(text=f"Welcome back, {current_user}!")
     load_api_movies() 
+
+def show_profile_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    dashboard_frame.place_forget()
+    profile_frame.place(relx=0.5, rely=0.5, anchor='center')
+    load_user_profile() # Dynamically populate the user's details
 
 # ---------------- LOGIN FRAME ----------------
 #FRAME CREATION AND TITLE
@@ -304,8 +318,8 @@ for genre in movie_genres:
 
 def submit_genres():
     selected_genres = [] #STORES 3 SELECTED GENRES
-    for genre_name in genre_vars():
-        if genre_vars[genre_name]==1: #IF VALUE IS 1,APPEND TO SELECTED GENRES
+    for genre_name in genre_vars:
+        if genre_vars[genre_name].get() == 1: #IF VALUE IS 1,APPEND TO SELECTED GENRES
             selected_genres.append(genre_name) 
     # ONLY 3 GENRES CHECK
     if len(selected_genres) != 3:
@@ -330,7 +344,7 @@ tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 welcome_label.pack(pady=10)
-profile_btn = tk.Button(dashboard_frame,text="👤 Profile",font=('Arial', 11, 'bold'),bg='black',fg='white',cursor='hand2',command=lambda: open_profile_window())
+profile_btn = tk.Button(dashboard_frame,text="👤 Profile",font=('Arial', 11, 'bold'),bg='black',fg='white',cursor='hand2',command=show_profile_screen)
 profile_btn.place(relx=0.95, rely=0.02, anchor='ne')
 
 #---------------------SEARCH BAR-------------------
@@ -577,7 +591,7 @@ def load_api_movies(search_query=""):
                     except:
                         pass
                 else:
-                   pass
+                    pass
                 #TITLE CONDITION FOR BIG MOVIE NAMES
                 if len(title) > 22 :
                     title = title[:19] + "..."
@@ -597,18 +611,18 @@ def load_api_movies(search_query=""):
     except :
         pass
 
-
     # Force tkinter to calculate the frame's new height, then update the canvas bounds
     scrollable_movie_frame.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
 
 #----------------------USER PROFILE--------------------------------------
-def open_profile_window():
-    #CREATING SIDE WINDOWN
-    profile_win = tk.Toplevel(base)
-    profile_win.title("User Profile")
-    profile_win.geometry("500x650")
-    profile_win.config(bg='white')
+# GLOBAL PROFILE FRAME CREATION
+profile_frame = tk.Frame(base, bg='white', bd=2)
+
+def load_user_profile():
+    # DELETES EXISTING WIDGETS IN PROFILE FRAME
+    for widget in profile_frame.winfo_children():
+        widget.destroy()
 
     # DATABASE CONNECTION
     con = psq.connect(**db_config)
@@ -638,51 +652,63 @@ def open_profile_window():
     genre3 = genre_data[2]
 
     # ---------------- TITLE ----------------
-    tk.Label(profile_win,text="👤 USER PROFILE",font=('Arial', 24, 'bold'),bg='white',fg='black').pack(pady=20)
+    tk.Label(profile_frame,text="👤 USER PROFILE",font=('Arial', 24, 'bold'),bg='white',fg='black').pack(pady=20)
 
     # ---------------- PROFILE FRAME----------------
-    profile_frame = tk.Frame(profile_win,bg='lightgrey',bd=2,relief='solid',padx=20,pady=20)
-    profile_frame.pack(pady=10, padx=20, fill='both', expand=True)
+    profile_inner = tk.Frame(profile_frame,bg='lightgrey',bd=2,relief='solid',padx=20,pady=20)
+    profile_inner.pack(pady=10, padx=20, fill='both', expand=True)
 
     # FULL NAME
-    tk.Label(profile_frame,text=f"Full Name : {fullname}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    tk.Label(profile_inner,text=f"Full Name : {fullname}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
     
     # AGE
-    tk.Label(profile_frame,text=f"Age : {age}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    tk.Label(profile_inner,text=f"Age : {age}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
 
     # GENDER
-    tk.Label(profile_frame,text=f"Gender : {gender}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    tk.Label(profile_inner,text=f"Gender : {gender}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
 
     # EMAIL
-    tk.Label(profile_frame,text=f"Email : {email}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    tk.Label(profile_inner,text=f"Email : {email}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
 
     # USERNAME
-    tk.Label(profile_frame,text=f"Username : {username}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    tk.Label(profile_inner,text=f"Username : {username}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
 
-    # PASSWORD
-    tk.Label(profile_frame,text=f"Password : {password}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    # PASSWORD (WITH SHOW/HIDE TOGGLE)
+    pass_frame = tk.Frame(profile_inner, bg='lightgrey')
+    pass_frame.pack(fill='x', pady=8)
+    pass_label = tk.Label(pass_frame, text=f"Password : {'*' * len(password)}", font=('Arial', 14), bg='lightgrey', anchor='w')
+    pass_label.pack(side='left')
+
+    def toggle_password():
+        if pass_btn.cget('text') == 'Show Password':
+            pass_label.config(text=f"Password : {password}")
+            pass_btn.config(text='Hide Password')
+        else:
+            pass_label.config(text=f"Password : {'*' * len(password)}")
+            pass_btn.config(text='Show Password')
+
+    pass_btn = tk.Button(pass_frame, text="Show Password", command=toggle_password, bg='black', fg='white', font=('Arial', 10), cursor='hand2')
+    pass_btn.pack(side='left', padx=10)
 
     # BIO
-    tk.Label(profile_frame,text=f"Bio : {bio}",font=('Arial', 14),bg='lightgrey',anchor='w',wraplength=350,justify='left').pack(fill='x', pady=8)
+    tk.Label(profile_inner,text=f"Bio : {bio}",font=('Arial', 14),bg='lightgrey',anchor='w',wraplength=350,justify='left').pack(fill='x', pady=8)
 
     # FAVORITE GENRES TITLE
-    tk.Label(profile_frame,text="Favorite Genres",font=('Arial', 16, 'bold'),bg='lightgrey').pack(pady=15)
+    tk.Label(profile_inner,text="Favorite Genres",font=('Arial', 16, 'bold'),bg='lightgrey').pack(pady=15)
 
     # GENRE 1
-    tk.Label(profile_frame,text=f"• {genre1}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+    tk.Label(profile_inner,text=f"• {genre1}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
 
     # GENRE 2
-    tk.Label(profile_frame,text=f"• {genre2}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+    tk.Label(profile_inner,text=f"• {genre2}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
 
     # GENRE 3
-    tk.Label(profile_frame,text=f"• {genre3}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+    tk.Label(profile_inner,text=f"• {genre3}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
 
-    # CLOSE BUTTON
-    tk.Button(profile_win,text="Close",font=('Arial', 12, 'bold'),bg='black',fg='white',command=profile_win.destroy).pack(pady=20)
+    # BACK TO DASHBOARD BUTTON
+    tk.Button(profile_frame,text="Back to Dashboard",font=('Arial', 12, 'bold'),bg='black',fg='white',cursor='hand2',command=show_dashboard_screen).pack(pady=20)
 
 # ---------------- INITIALIZATION ----------------
 init_db()
 show_login_screen()
 base.mainloop()
-
-#SHOW PASSWORD-USER PROFILE
