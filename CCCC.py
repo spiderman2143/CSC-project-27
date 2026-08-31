@@ -435,10 +435,12 @@ def show_watchlist_screen():
                     pass
             if len(title) > 22:
                 display_title = title[:19] + "..." 
+            else:
+                display_title = title
             
             tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
-            
             tk.Button(movie_card, text="Remove", bg='red', fg='white', command=lambda m_id=movie_id: remove_from_watchlist(m_id)).pack(pady=10)
+            
 
             col += 1
             if col >= max_columns:
