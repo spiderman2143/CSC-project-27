@@ -12,8 +12,8 @@ TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid T
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'charan123', 
-    'database': 'charan'
+    'password': '2101', 
+    'database': 'sandhya'
 }
 
 current_user = None

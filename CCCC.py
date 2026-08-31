@@ -12,8 +12,8 @@ TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid T
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'charan123', 
-    'database': 'charan'
+    'password': '2101', 
+    'database': 'sandhya'
 }
 
 current_user = None
@@ -27,6 +27,7 @@ def init_db():
     cur.execute("CREATE TABLE IF NOT EXISTS usergenres (username VARCHAR(50) PRIMARY KEY, genre1 VARCHAR(20), genre2 VARCHAR(20), genre3 VARCHAR(20))")
     cur.execute("CREATE TABLE IF NOT EXISTS reviews(review_id INT AUTO_INCREMENT PRIMARY KEY,username VARCHAR(50),movie_name VARCHAR(100),"
 "story INT,screenplay INT,acting INT,direction INT,music INT,visual_effects INT,entertainment INT,avg_rating FLOAT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS watchlist (username VARCHAR(50), movie_id INT, movie_name VARCHAR(100), poster_path VARCHAR(200))")
     con.commit()
     con.close()
 
@@ -68,7 +69,7 @@ def user_signup():
 
         messagebox.showinfo("Success", "Account created!")
         show_login_screen()
-
+    #IF USERNAME ALREADY EXISTS
     except psq.IntegrityError:
         messagebox.showerror("Error", "Username already exists!")
 
@@ -149,7 +150,7 @@ base.geometry("1200x800")
 #BACKGROUND PICTURE
 try:
     img = Image.open("MOVIE.jpeg")
-    img = img.resize((1200, 800))
+    img = img.resize((1200, 800))# to fit geometry of page
     bg_photo = ImageTk.PhotoImage(img)
     bg_label = tk.Label(base, image=bg_photo)
     bg_label.place(x=0, y=0, relwidth=1, relheight=1)
@@ -195,9 +196,10 @@ def show_dashboard_screen():
     genre_frame.place_forget()
     admin_frame.place_forget()
     profile_frame.place_forget()
+    watchlist_frame.place_forget()
     dashboard_frame.place(relx=0.5, rely=0.5, anchor='center')
     welcome_label.config(text=f"Welcome back, {current_user}!")
-    load_api_movies() 
+    load_api_movies() #connects the apimovie database and fetches movies
 
 def show_profile_screen():
     login_frame.place_forget()
@@ -206,7 +208,8 @@ def show_profile_screen():
     admin_frame.place_forget()
     dashboard_frame.place_forget()
     profile_frame.place(relx=0.5, rely=0.5, anchor='center')
-    load_user_profile() # Dynamically populate the user's details
+    load_user_profile() #button to show the details
+
 
 # ---------------- LOGIN FRAME ----------------
 #FRAME CREATION AND TITLE
@@ -224,9 +227,9 @@ enterpass = tk.Entry(login_frame, width=30, show="*")
 enterpass.pack(pady=10)
 
 #3 BUTTONS-LOGIN,SIGNUP,ADMIN
-tk.Button(login_frame, text="Login", command=login_action).pack(pady=20)
-tk.Button(login_frame, text="Create Account", command=show_signup_screen).pack()
-tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5)
+tk.Button(login_frame, text="Login", command=login_action).pack(pady=20) #login button=go to logicaction fun to get user,pwd
+tk.Button(login_frame, text="Create Account", command=show_signup_screen).pack() #create account button=go to signup and get all details
+tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5) #showadmin screen
 
 #---------------- ADMIN FRAME --------------
 #FRAME CREATION AND TITLE
@@ -340,13 +343,124 @@ def submit_genres():
 
 tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
 
+# ---------------- WATCHLIST SYSTEM ----------------
+watchlist_frame = tk.Frame(base, bg='white', bd=2)
+#FUNCTION TO RUN IF WATCHLIST BUTTON IS CLICKED
+def add_to_watchlist(movie):
+    movie_id = movie.get("id") #ID IN TMDB
+    title = movie.get("title") #TITLE
+    poster = movie.get("poster_path") #PHOTOIMG
+
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        
+        #CHECKING IF ALREADY ADDED IN THE TABLE 
+        cur.execute("SELECT * FROM watchlist WHERE username=%s AND movie_id=%s", (current_user, movie_id))
+        if cur.fetchone(): #IF ONE REC IS FETCHED-DONT ADD - DISPLAY ALREADY THERE
+            messagebox.showinfo("Info", f"'{title}' is already in your Watchlist!")
+        else: #IF NOT- ADD IN THE TABLE
+            cur.execute("INSERT INTO watchlist (username, movie_id, movie_name, poster_path) VALUES (%s, %s, %s, %s)",
+                        (current_user, movie_id, title, poster))
+            con.commit()
+            messagebox.showinfo("Success", f"Added '{title}' to Watchlist!")
+        con.close()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not add to watchlist: {e}")
+
+#FUNCTION TO RUN IF U WANT TO REMOVE A MOVIE
+def remove_from_watchlist(movie_id):
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("DELETE FROM watchlist WHERE username=%s AND movie_id=%s", (current_user, movie_id)) 
+        con.commit()
+        con.close()
+        messagebox.showinfo("Success", "Removed from Watchlist")
+        show_watchlist_screen() # SHOW AFTER UPDATION 
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not remove movie: {e}")
+
+def show_watchlist_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    dashboard_frame.place_forget()
+    watchlist_frame.place(relx=0.5, rely=0.5, anchor='center', relwidth=0.9, relheight=0.9)
+    for widget in watchlist_frame.winfo_children():
+            widget.destroy()
+    tk.Label(watchlist_frame, text="📺 MY WATCHLIST", font=('Arial', 24, 'bold'), bg='white').pack(pady=10)
+    tk.Button(watchlist_frame, text="Back to Dashboard", font=('Arial', 12, 'bold'), bg='black', fg='white', command=show_dashboard_screen).pack(pady=5)
+
+# SCROLLBAR
+    wl_canvas_frame = tk.Frame(watchlist_frame, bg='white')
+    wl_canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+    wl_canvas = tk.Canvas(wl_canvas_frame, bg='white')
+    wl_scrollbar = ttk.Scrollbar(wl_canvas_frame, orient="vertical", command=wl_canvas.yview)
+    wl_scrollable_frame = tk.Frame(wl_canvas, bg='white')
+    
+    wl_canvas.create_window((0, 0), window=wl_scrollable_frame, anchor="nw") 
+    wl_canvas.configure(yscrollcommand=wl_scrollbar.set)
+    wl_canvas.pack(side="left", fill="both", expand=True)
+    wl_scrollbar.pack(side="right", fill="y")
+
+    #CHECKING IF WATCHLIST IS EMPTY
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("SELECT movie_id, movie_name, poster_path FROM watchlist WHERE username=%s", (current_user,))
+        saved_movies = cur.fetchall()
+        con.close()
+
+        if not saved_movies:
+            tk.Label(wl_scrollable_frame, text="Your watchlist is empty.Add something!!!", font=('Arial', 14), bg='white').pack(pady=40, padx=40)
+            return
+
+        row, col, max_columns = 0, 0, 4
+        for movie_id, title, poster_path in saved_movies:
+            movie_card = tk.Frame(wl_scrollable_frame, bg='white', bd=1, relief="solid")
+            movie_card.grid(row=row, column=col, padx=15, pady=15)
+
+            if poster_path:
+                img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+                try:
+                    img_response = requests.get(img_url)
+                    img_data = Image.open(io.BytesIO(img_response.content)).resize((150, 225))
+                    photo = ImageTk.PhotoImage(img_data)
+                    img_label = tk.Label(movie_card, image=photo, bg='white')
+                    img_label.image = photo 
+                    img_label.pack(pady=5, padx=5)
+                except:
+                    pass
+            if len(title) > 22:
+                display_title = title[:19] + "..." 
+            
+            tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
+            
+            tk.Button(movie_card, text="Remove", bg='red', fg='white', command=lambda m_id=movie_id: remove_from_watchlist(m_id)).pack(pady=10)
+
+            col += 1
+            if col >= max_columns:
+                col = 0
+                row += 1
+
+        wl_scrollable_frame.update_idletasks()
+        wl_canvas.configure(scrollregion=wl_canvas.bbox("all"))
+
+    except Exception as e:
+        tk.Label(wl_scrollable_frame, text=f"Error loading watchlist: {e}", bg='white').pack()
+
 # ---------------- DASHBOARD ----------------
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 welcome_label.pack(pady=10)
+
 profile_btn = tk.Button(dashboard_frame,text="👤 Profile",font=('Arial', 11, 'bold'),bg='black',fg='white',cursor='hand2',command=show_profile_screen)
 profile_btn.place(relx=0.95, rely=0.02, anchor='ne')
 
+watchlist_btn = tk.Button(dashboard_frame,text="📺 Watchlist",font=('Arial', 11, 'bold'),bg='green',fg='white',cursor='hand2',command=show_watchlist_screen)
+watchlist_btn.place(relx=0.85, rely=0.02, anchor='ne')
 #---------------------SEARCH BAR-------------------
 search_frame = tk.Frame(dashboard_frame, bg='white')
 search_frame.pack(pady=10)
@@ -607,7 +721,9 @@ def load_api_movies(search_query=""):
 
                 #ADD REVIEW BUTTON
                 tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
-                    
+
+                #ADD WATCHLIST BUTTON
+                tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
     except :
         pass
 
