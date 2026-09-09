@@ -510,7 +510,7 @@ def remove_from_watchlist(movie_id):
 
 # ---------------- MY REVIEWS SYSTEM ----------------
 my_reviews_frame = tk.Frame(base, bg='white', bd=2)
-
+#DELETING REVIEWS
 def delete_review(movie_name):
     try:
         con = psq.connect(**db_config)
@@ -521,7 +521,7 @@ def delete_review(movie_name):
         messagebox.showinfo("Success", f"Review for '{movie_name}' deleted!")
         show_my_reviews_screen() # Refresh the screen
     except Exception as e:
-        messagebox.showerror("Error", f"Could not delete review: {e}")
+        pass
 
 def show_my_reviews_screen():
     # Hide all other frames
@@ -556,24 +556,24 @@ def show_my_reviews_screen():
     rev_canvas.pack(side="left", fill="both", expand=True)
     rev_scrollbar.pack(side="right", fill="y")
 
-    # Fetch from Database
+    # Fetch from TABLE
     try:
         con = psq.connect(**db_config)
         cur = con.cursor()
         cur.execute("SELECT movie_name, story, screenplay, acting, direction, music, visual_effects, entertainment, avg_rating FROM reviews WHERE username=%s", (current_user,))
-        user_reviews = cur.fetchall()
+        user_reviews = cur.fetchall() #LIST OF TUPLES CONTAINING EACH MOVIE
         con.close()
 
-        if not user_reviews:
+        if not user_reviews: #EMPTY
             tk.Label(rev_scrollable_frame, text="You haven't reviewed any movies yet!", font=('Arial', 14), bg='white').pack(pady=40, padx=40)
             return
 
         row, col, max_columns = 0, 0, 3 # Display 3 cards per row
         
         # Build Review Cards
-        for rev in user_reviews:
-            m_name, st, sc, ac, dr, mu, ve, en, avg = rev
-            
+        for rev in user_reviews: #REV IS A TUPLES
+            m_name, st, sc, ac, dr, mu, ve, en, avg = rev #PARAMETERS UNPACK
+            #SHOWING AS CARD
             card = tk.Frame(rev_scrollable_frame, bg='lightgrey', bd=1, relief="solid", padx=15, pady=15)
             card.grid(row=row, column=col, padx=20, pady=20, sticky="nsew")
 
@@ -584,7 +584,7 @@ def show_my_reviews_screen():
             # Average Rating
             tk.Label(card, text=f"Overall: {round(avg, 1)} ★", font=('Arial', 12, 'bold'), fg='red', bg='lightgrey').pack(pady=5)
 
-            # Detailed Breakdown
+            # Detailed Breakdown-PARAMETERS
             details_text = f"Story: {st} | Screenplay: {sc} | Acting: {ac}\nDirection: {dr} | Music: {mu}\nVisuals: {ve} | Entertainment: {en}"
             tk.Label(card, text=details_text, font=('Arial', 10), bg='lightgrey', justify=tk.CENTER).pack(pady=10)
 
@@ -602,8 +602,8 @@ def show_my_reviews_screen():
         rev_canvas.configure(scrollregion=rev_canvas.bbox("all"))
 
     except Exception as e:
-        tk.Label(rev_scrollable_frame, text=f"Error loading reviews: {e}", bg='white').pack()
-
+        pass
+#-----------------------WATCHLIST----------------------------
 def show_watchlist_screen():
     login_frame.place_forget()
     signup_frame.place_forget()
@@ -696,7 +696,7 @@ my_reviews_btn.place(relx=0.73, rely=0.02, anchor='ne')
 search_frame = tk.Frame(dashboard_frame, bg='white')
 search_frame.pack(pady=10)
 #SEARCH BOX
-search_entry = tk.Entry(search_frame, width=40, font=('Arial', 12))
+search_entry = tk.Entry(search_frame, width=20, font=('Arial', 12))
 search_entry.pack(side=tk.LEFT, padx=10)
 
 #TO SEARCH A PARTCULAR MOVIE-Search movie button
