@@ -681,16 +681,19 @@ dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
 welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
 welcome_label.pack(pady=10)
 
-profile_btn = tk.Button(dashboard_frame,text="👤 Profile",font=('Arial', 11, 'bold'),bg='black',fg='white',cursor='hand2',command=show_profile_screen)
-profile_btn.place(relx=0.95, rely=0.02, anchor='ne')
+# Create a navigation container anchored to the top right
+nav_frame = tk.Frame(dashboard_frame, bg='white')
+nav_frame.place(relx=1.0, rely=0.0, anchor='ne')
 
-watchlist_btn = tk.Button(dashboard_frame,text="📺 Watchlist",font=('Arial', 11, 'bold'),bg='green',fg='white',cursor='hand2',command=show_watchlist_screen)
-watchlist_btn.place(relx=0.85, rely=0.02, anchor='ne')
+# Pack buttons inside the container from right to left
+profile_btn = tk.Button(nav_frame, text="👤 Profile", font=('Arial', 11, 'bold'), bg='black', fg='white', cursor='hand2', command=show_profile_screen)
+profile_btn.pack(side='right', padx=5)
 
+watchlist_btn = tk.Button(nav_frame, text="📺 Watchlist", font=('Arial', 11, 'bold'), bg='green', fg='white', cursor='hand2', command=show_watchlist_screen)
+watchlist_btn.pack(side='right', padx=5)
 
-my_reviews_btn = tk.Button(dashboard_frame,text="⭐ My Reviews",font=('Arial', 11, 'bold'),bg='gold',fg='black',cursor='hand2',command=show_my_reviews_screen)
-my_reviews_btn.place(relx=0.73, rely=0.02, anchor='ne')
-
+my_reviews_btn = tk.Button(nav_frame, text="⭐ My Reviews", font=('Arial', 11, 'bold'), bg='gold', fg='black', cursor='hand2', command=show_my_reviews_screen)
+my_reviews_btn.pack(side='right', padx=5)
 
 #---------------------SEARCH BAR-------------------
 search_frame = tk.Frame(dashboard_frame, bg='white')
