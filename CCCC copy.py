@@ -343,12 +343,12 @@ def show_birthday_movies():
         month = dob.month
         day = dob.day
          # SEARCH ONLY RECENT YEARS
-        current_year = datetime.now().year
-        start_year = current_year - 30
-        all_movies = []
+        current_year = datetime.now().year #CURRENT YEAR
+        start_year = current_year - 30 
+        all_movies = [] #RESULTS
         # SEARCH 31 YEARS ONLY
         for year in range(start_year, current_year + 1):
-            date = f"{year}-{month:02d}-{day:02d}"
+            date = f"{year}-{month:02d}-{day:02d}" #STRING FORMAT
             url = (
                 f"https://api.themoviedb.org/3/discover/movie?"
                 f"api_key={TMDB_API_KEY}"
@@ -366,7 +366,7 @@ def show_birthday_movies():
         unique_movies = {}
         for movie in all_movies:
             unique_movies[movie["id"]] = movie
-        movies = list(unique_movies.values())
+        movies = list(unique_movies.values())#ADDING ONLY UNIQUE VALUES
 
         # TITLE
         tk.Label(scrollable_movie_frame,text=f"🎂 Movies Released on your birthdayy!!!",font=('Arial', 20, 'bold'),bg='white').grid(
@@ -429,7 +429,7 @@ def show_birthday_movies():
         canvas.configure(scrollregion=canvas.bbox("all"))
 
     except Exception as e:
-        messagebox.showerror("Error",f"Could not load birthday movies.\n{e}")
+        pass
 # ---------------- GENRE SELECTION FRAME ----------------
 #FRAME CREATION,TITLE,MESSAGE
 genre_frame = tk.Frame(base, bg='white', bd=2)
