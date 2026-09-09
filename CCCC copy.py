@@ -415,6 +415,8 @@ def show_birthday_movies():
             tk.Label(movie_card,text=f"Released: {release_date}",font=('Arial', 9),bg='white').pack()
             # DETAILS BUTTON
             tk.Button(movie_card,text="See Details",bg='blue',fg='white',command=lambda m=movie:open_details_window(m)).pack(pady=5)
+            tk.Button(movie_card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=2)
+            tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
 
             # MOVE TO NEXT COLUMN
             col += 1
