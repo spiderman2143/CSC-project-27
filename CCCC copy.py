@@ -678,14 +678,20 @@ def show_watchlist_screen():
 
 # ---------------- DASHBOARD ----------------
 dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
-welcome_label = tk.Label(dashboard_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
-welcome_label.pack(pady=10)
 
-# Create a navigation container anchored to the top right
-nav_frame = tk.Frame(dashboard_frame, bg='white')
-nav_frame.place(relx=1.0, rely=0.0, anchor='ne')
+# 1. Create a single horizontal Header Frame
+header_frame = tk.Frame(dashboard_frame, bg='white')
+header_frame.pack(fill='x', pady=10) # fill='x' forces it to span the whole width
 
-# Pack buttons inside the container from right to left
+# 2. Put the Welcome Label on the LEFT side of the header
+welcome_label = tk.Label(header_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
+welcome_label.pack(side='left')
+
+# 3. Create a Navigation Frame on the RIGHT side of the header
+nav_frame = tk.Frame(header_frame, bg='white')
+nav_frame.pack(side='right')
+
+# 4. Pack the buttons inside the Nav Frame (they will line up perfectly)
 profile_btn = tk.Button(nav_frame, text="👤 Profile", font=('Arial', 11, 'bold'), bg='black', fg='white', cursor='hand2', command=show_profile_screen)
 profile_btn.pack(side='right', padx=5)
 
