@@ -508,6 +508,102 @@ def remove_from_watchlist(movie_id):
     except Exception as e:
         messagebox.showerror("Error", f"Could not remove movie: {e}")
 
+# ---------------- MY REVIEWS SYSTEM ----------------
+my_reviews_frame = tk.Frame(base, bg='white', bd=2)
+
+def delete_review(movie_name):
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("DELETE FROM reviews WHERE username=%s AND movie_name=%s", (current_user, movie_name))
+        con.commit()
+        con.close()
+        messagebox.showinfo("Success", f"Review for '{movie_name}' deleted!")
+        show_my_reviews_screen() # Refresh the screen
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not delete review: {e}")
+
+def show_my_reviews_screen():
+    # Hide all other frames
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    dashboard_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    
+    # Place My Reviews Frame
+    my_reviews_frame.place(relx=0.5, rely=0.5, anchor='center', relwidth=0.9, relheight=0.9)
+    
+    # Clear old widgets
+    for widget in my_reviews_frame.winfo_children():
+        widget.destroy()
+
+    # Titles and Back Button
+    tk.Label(my_reviews_frame, text="⭐ MY REVIEWS", font=('Arial', 24, 'bold'), bg='white').pack(pady=10)
+    tk.Button(my_reviews_frame, text="Back to Dashboard", font=('Arial', 12, 'bold'), bg='black', fg='white', command=show_dashboard_screen).pack(pady=5)
+
+    # Scrollbar Setup
+    rev_canvas_frame = tk.Frame(my_reviews_frame, bg='white')
+    rev_canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+    rev_canvas = tk.Canvas(rev_canvas_frame, bg='white')
+    rev_scrollbar = ttk.Scrollbar(rev_canvas_frame, orient="vertical", command=rev_canvas.yview)
+    rev_scrollable_frame = tk.Frame(rev_canvas, bg='white')
+    
+    rev_canvas.create_window((0, 0), window=rev_scrollable_frame, anchor="nw") 
+    rev_canvas.configure(yscrollcommand=rev_scrollbar.set)
+    rev_canvas.pack(side="left", fill="both", expand=True)
+    rev_scrollbar.pack(side="right", fill="y")
+
+    # Fetch from Database
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("SELECT movie_name, story, screenplay, acting, direction, music, visual_effects, entertainment, avg_rating FROM reviews WHERE username=%s", (current_user,))
+        user_reviews = cur.fetchall()
+        con.close()
+
+        if not user_reviews:
+            tk.Label(rev_scrollable_frame, text="You haven't reviewed any movies yet!", font=('Arial', 14), bg='white').pack(pady=40, padx=40)
+            return
+
+        row, col, max_columns = 0, 0, 3 # Display 3 cards per row
+        
+        # Build Review Cards
+        for rev in user_reviews:
+            m_name, st, sc, ac, dr, mu, ve, en, avg = rev
+            
+            card = tk.Frame(rev_scrollable_frame, bg='lightgrey', bd=1, relief="solid", padx=15, pady=15)
+            card.grid(row=row, column=col, padx=20, pady=20, sticky="nsew")
+
+            # Limit title length if too long
+            display_title = m_name if len(m_name) <= 22 else m_name[:19] + "..."
+            tk.Label(card, text=display_title, font=('Arial', 14, 'bold'), bg='lightgrey').pack(pady=(0, 5))
+            
+            # Average Rating
+            tk.Label(card, text=f"Overall: {round(avg, 1)} ★", font=('Arial', 12, 'bold'), fg='red', bg='lightgrey').pack(pady=5)
+
+            # Detailed Breakdown
+            details_text = f"Story: {st} | Screenplay: {sc} | Acting: {ac}\nDirection: {dr} | Music: {mu}\nVisuals: {ve} | Entertainment: {en}"
+            tk.Label(card, text=details_text, font=('Arial', 10), bg='lightgrey', justify=tk.CENTER).pack(pady=10)
+
+            # Delete Button
+            tk.Button(card, text="Delete Review", bg='red', fg='white', command=lambda m=m_name: delete_review(m)).pack(pady=5)
+
+            # Move to next column
+            col += 1
+            if col >= max_columns:
+                col = 0
+                row += 1
+
+        # Update scrollable region
+        rev_scrollable_frame.update_idletasks()
+        rev_canvas.configure(scrollregion=rev_canvas.bbox("all"))
+
+    except Exception as e:
+        tk.Label(rev_scrollable_frame, text=f"Error loading reviews: {e}", bg='white').pack()
+
 def show_watchlist_screen():
     login_frame.place_forget()
     signup_frame.place_forget()
@@ -590,6 +686,10 @@ profile_btn.place(relx=0.95, rely=0.02, anchor='ne')
 
 watchlist_btn = tk.Button(dashboard_frame,text="📺 Watchlist",font=('Arial', 11, 'bold'),bg='green',fg='white',cursor='hand2',command=show_watchlist_screen)
 watchlist_btn.place(relx=0.85, rely=0.02, anchor='ne')
+
+
+my_reviews_btn = tk.Button(dashboard_frame,text="⭐ My Reviews",font=('Arial', 11, 'bold'),bg='gold',fg='black',cursor='hand2',command=show_my_reviews_screen)
+my_reviews_btn.place(relx=0.73, rely=0.02, anchor='ne')
 
 
 #---------------------SEARCH BAR-------------------
