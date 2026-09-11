@@ -5,9 +5,10 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import requests
 import io
+import threading 
 from tkcalendar import DateEntry
 from datetime import datetime 
-
+from concurrent.futures import ThreadPoolExecutor
 # ---------------- CONFIGURATION ----------------
 TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid TMDb API key
 
@@ -173,6 +174,8 @@ def show_signup_screen():
     dashboard_frame.place_forget()
     admin_frame.place_forget()
     profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
     signup_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_login_screen():
@@ -181,6 +184,8 @@ def show_login_screen():
     dashboard_frame.place_forget()
     admin_frame.place_forget()
     profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
     login_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_adminscreen():
@@ -189,6 +194,8 @@ def show_adminscreen():
     genre_frame.place_forget()
     dashboard_frame.place_forget()
     profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
     admin_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_genre_screen():
@@ -197,6 +204,8 @@ def show_genre_screen():
     dashboard_frame.place_forget()
     admin_frame.place_forget()
     profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
     genre_frame.place(relx=0.5, rely=0.5, anchor='center')
 
 def show_dashboard_screen():
@@ -206,6 +215,7 @@ def show_dashboard_screen():
     admin_frame.place_forget()
     profile_frame.place_forget()
     watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
     dashboard_frame.place(relx=0.5, rely=0.5, anchor='center')
     welcome_label.config(text=f"Welcome back, {current_user}!")
     load_api_movies() #connects the apimovie database and fetches movies
@@ -216,6 +226,8 @@ def show_profile_screen():
     genre_frame.place_forget()
     admin_frame.place_forget()
     dashboard_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()     
     profile_frame.place(relx=0.5, rely=0.5, anchor='center')
     load_user_profile() #button to show the details
 
@@ -318,118 +330,147 @@ confirm_entry.pack()
 tk.Button(signup_frame, text="Register", command=user_signup).pack(pady=10)
 tk.Button(signup_frame, text="Back to Login", command=show_login_screen).pack()
 
-#----------------BIRTHDAY MOVIE DISPLAY------------------
 # ---------------- BIRTHDAY MOVIES ----------------
 def show_birthday_movies():
-    # CLEAR OLD MOVIES
+    # 1. CLEAR OLD MOVIES
     for widget in scrollable_movie_frame.winfo_children():
         widget.destroy()
 
-    try:
-        # CONNECT TO DATABASE
-        con = psq.connect(**db_config)
-        cur = con.cursor()
-        # GET USER DOB
-        cur.execute("SELECT dob FROM userdetails WHERE username=%s",(current_user,))
-        result = cur.fetchone()
-        con.close()
+    # 2. SHOW A FUNNY LOADING MESSAGE
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Sending 31 friends to the internet. Hold on...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label.grid(row=0, column=0, columnspan=4, pady=20)
 
-        if not result or not result[0]:
-            messagebox.showerror("Error","Date of birth not found.")
-            return
+    # 3. THE HELPER (AND FRIENDS) WORKING IN THE BACKGROUND
+    def fetch_birthday_data():
+        try:
+            # Check the database for their birthday
+            con = psq.connect(**db_config)
+            cur = con.cursor()
+            cur.execute("SELECT dob FROM userdetails WHERE username=%s", (current_user,))
+            result = cur.fetchone()
+            con.close()
 
-        # GET MONTH AND DAY
-        dob = result[0]
-        month = dob.month
-        day = dob.day
-         # SEARCH ONLY RECENT YEARS
-        current_year = datetime.now().year #CURRENT YEAR
-        start_year = current_year - 30 
-        all_movies = [] #RESULTS
-        # SEARCH 31 YEARS ONLY
-        for year in range(start_year, current_year + 1):
-            date = f"{year}-{month:02d}-{day:02d}" #STRING FORMAT
-            url = (
-                f"https://api.themoviedb.org/3/discover/movie?"
-                f"api_key={TMDB_API_KEY}"
-                f"&primary_release_date.gte={date}"
-                f"&primary_release_date.lte={date}"
-                f"&sort_by=popularity.desc"
-            )
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                for movie in data.get("results", []):
-                    all_movies.append(movie)
+            if not result or not result[0]:
+                base.after(0, lambda: messagebox.showerror("Error", "Date of birth not found."))
+                base.after(0, loading_label.destroy)
+                return
 
-        # REMOVE DUPLICATES
-        unique_movies = {}
-        for movie in all_movies:
-            unique_movies[movie["id"]] = movie
-        movies = list(unique_movies.values())#ADDING ONLY UNIQUE VALUES
+            dob = result[0]
+            month = dob.month
+            day = dob.day
+            current_year = datetime.now().year
+            start_year = current_year - 30 
 
-        # TITLE
-        tk.Label(scrollable_movie_frame,text=f"🎂 Movies Released on your birthdayy!!!",font=('Arial', 20, 'bold'),bg='white').grid(
-            row=0,column=0,columnspan=4,pady=20)
-        # NO MOVIES
-        if not movies:
-            tk.Label(scrollable_movie_frame,text="No movies found for your birthday.",font=('Arial', 14),bg='white').grid(
-            row=1,column=0,columnspan=4,pady=20)
-            return
+            # Prepare all 31 internet links
+            urls = []
+            for year in range(start_year, current_year + 1):
+                date = f"{year}-{month:02d}-{day:02d}"
+                url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&primary_release_date.gte={date}&primary_release_date.lte={date}&sort_by=popularity.desc"
+                urls.append(url)
 
-        row = 1
-        col = 0
-        max_columns = 4
-
-        # DISPLAY MOVIES
-        for movie in movies[:10]:
-            title = movie.get("title", "Unknown")
-            poster_path = movie.get("poster_path")
-            movie_card = tk.Frame(scrollable_movie_frame,bg='white',bd=1,relief="solid")
-            movie_card.grid(row=row,column=col,padx=15,pady=15)
-
-            # POSTER
-            if poster_path:
-                img_url = (f"https://image.tmdb.org/t/p/w200"f"{poster_path}")
+            # --- THE MAGIC FRIENDS TRICK ---
+            # This mini-function checks ONE link
+            def fetch_single_url(link):
                 try:
-                    img_response = requests.get(img_url,timeout=10)
-                    img_data = Image.open(io.BytesIO(img_response.content))
-                    img_data = img_data.resize((150, 225))
-                    photo = ImageTk.PhotoImage(img_data)
-                    img_label = tk.Label(movie_card,image=photo,bg='white')
-                    img_label.image = photo
-                    img_label.pack(pady=5)
+                    resp = requests.get(link, timeout=5)
+                    if resp.status_code == 200:
+                        return resp.json().get("results", [])
+                except:
+                    return []
+                return []
 
-                except Exception:
-                    pass
+            # We unleash 20 helpers at the EXACT SAME TIME to check all 31 links!
+            all_movies = []
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                # 'executor.map' sends all the links to the helpers instantly
+                results_list = list(executor.map(fetch_single_url, urls))
+            
+            # Put all the found movies into one big pile
+            for res in results_list:
+                all_movies.extend(res)
 
-            # SHORTEN TITLE
-            display_title = title
-            if len(display_title) > 22:
-                display_title = display_title[:19] + "..."
+            # Remove duplicates and take only the top 10 movies
+            unique_movies = {movie["id"]: movie for movie in all_movies}
+            top_10_movies = list(unique_movies.values())[:10]
 
-            tk.Label(movie_card,text=display_title,font=('Arial', 10, 'bold'),bg='white').pack(pady=5)
+            # --- SECOND FRIENDS TRICK FOR POSTERS ---
+            # Now we send 10 friends to download the 10 posters at the same time
+            def fetch_poster(movie):
+                img_data = None
+                poster_path = movie.get("poster_path")
+                if poster_path:
+                    img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+                    try:
+                        img_data = requests.get(img_url, timeout=5).content
+                    except:
+                        pass
+                return (movie, img_data)
 
-            # RELEASE DATE
-            release_date = movie.get("release_date","Unknown")
-            tk.Label(movie_card,text=f"Released: {release_date}",font=('Arial', 9),bg='white').pack()
-            # DETAILS BUTTON
-            tk.Button(movie_card,text="See Details",bg='blue',fg='white',command=lambda m=movie:open_details_window(m)).pack(pady=5)#hi
-            tk.Button(movie_card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=2)
-            tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                movies_and_posters = list(executor.map(fetch_poster, top_10_movies))
 
-            # MOVE TO NEXT COLUMN
-            col += 1
-            if col >= max_columns:
-                col = 0
-                row += 1
+            # 4. HAND EVERYTHING TO THE CHEF (Tkinter)
+            base.after(0, render_birthday_movies, movies_and_posters, loading_label)
 
-        # UPDATE SCROLL
-        scrollable_movie_frame.update_idletasks()
-        canvas.configure(scrollregion=canvas.bbox("all"))
+        except Exception as e:
+            base.after(0, loading_label.destroy)
 
-    except Exception as e:
-        pass
+
+    # 5. SEND THE HEAD HELPER TO START THE PROCESS
+    threading.Thread(target=fetch_birthday_data, daemon=True).start()
+
+
+# 6. THE CHEF DRAWS THE SCREEN (Main Thread)
+def render_birthday_movies(movies_and_posters, loading_label):
+    loading_label.destroy()
+
+    tk.Label(scrollable_movie_frame, text="🎂 Movies Released on your birthdayy!!!", font=('Arial', 20, 'bold'), bg='white').grid(row=0, column=0, columnspan=4, pady=20)
+
+    if not movies_and_posters:
+        tk.Label(scrollable_movie_frame, text="No movies found for your birthday.", font=('Arial', 14), bg='white').grid(row=1, column=0, columnspan=4, pady=20)
+        return
+
+    row, col, max_columns = 1, 0, 4
+
+    for movie, img_bytes in movies_and_posters:
+        title = movie.get("title", "Unknown")
+        
+        movie_card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
+        movie_card.grid(row=row, column=col, padx=15, pady=15)
+
+        # Draw the picture
+        if img_bytes:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).resize((150, 225))
+                photo = ImageTk.PhotoImage(img)
+                img_label = tk.Label(movie_card, image=photo, bg='white')
+                img_label.image = photo 
+                img_label.pack(pady=5)
+            except:
+                pass
+
+        # Shorten Title
+        display_title = title if len(title) <= 22 else title[:19] + "..."
+        tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=5)
+
+        # Release Date
+        release_date = movie.get("release_date", "Unknown")
+        tk.Label(movie_card, text=f"Released: {release_date}", font=('Arial', 9), bg='white').pack()
+
+        # Buttons
+        tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+        tk.Button(movie_card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=2)
+        tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+
+        col += 1
+        if col >= max_columns:
+            col = 0
+            row += 1
+
+    # Update scroll
+    scrollable_movie_frame.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
 # ---------------- GENRE SELECTION FRAME ----------------
 #FRAME CREATION,TITLE,MESSAGE
 genre_frame = tk.Frame(base, bg='white', bd=2)
@@ -906,71 +947,95 @@ def open_details_window(movie):
 
 # FETCH MOVIE AND DISPLAY IN GRID
 def load_api_movies(search_query=""):
-    #DELETES EXISTING MOVIES IN FRAME
     for widget in scrollable_movie_frame.winfo_children():
         widget.destroy()
 
-    if search_query == "": #EMPTY CHECK-DISPLAY WHATEVER THERE
-        url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}"
-    else: #NOT EMPTY-DISPLAY WHAT IS SEARCHED
-        url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_query}"
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Relax and wait until we load en...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label.grid(row=0, column=0, pady=20, padx=20)
 
-    try:
-        response = requests.get(url)
-        if response.status_code == 200: #WHEN SITE RUNS AND GIVES OUTPUT-200 DEFAULT STATUS CODE
-            data = response.json() #data IS DICT WITH KEY-REQUESTS AND ENTIRE MOVIE LIST-VALUE
-            results = data.get("results") #results IS ENTIRE MOVIE LIST
-            row = 0
+    def fetch_data():
+        if search_query == "":
+            url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}"
+        else:
+            url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_query}"
+
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                results = response.json().get("results", [])[:10]
+                
+                movies_data = [] # We will put the movie info and raw image data here
+                
+                # The helper fetches the movie info AND downloads the posters
+                for movie in results:
+                    img_data = None
+                    poster_path = movie.get("poster_path")
+                    if poster_path:
+                        img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+                        try:
+                            # We just download the raw bytes, we don't draw it yet!
+                            img_response = requests.get(img_url)
+                            img_data = img_response.content 
+                        except:
+                            pass
+                    movies_data.append((movie, img_data))
+
+                # 4. HAND IT BACK TO TKINTER
+                # base.after(0, ...) tells Tkinter to run 'render_movies' immediately
+                base.after(0, render_movies, movies_data, loading_label)
+        except Exception as e:
+            pass # You could use base.after here to show an error label too!
+
+    # 5. SEND THE HELPER TO WORK!
+    # daemon=True means if you close the app, the helper stops immediately.
+    threading.Thread(target=fetch_data, daemon=True).start()
+
+
+# 6. THE CHEF DRAWS THE SCREEN (Main Thread)
+# This function is called by the radio (base.after) once the helper is done.
+def render_movies(movies_data, loading_label):
+    loading_label.destroy() # Remove the "Loading..." message
+
+    row, col, max_columns = 0, 0, 4 
+
+    for movie, img_bytes in movies_data: 
+        title = movie.get("title")
+        
+        movie_card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
+        movie_card.grid(row=row, column=col, padx=15, pady=15)
+        
+        # Turn the raw bytes into a real Tkinter picture
+        if img_bytes:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).resize((150, 225))
+                photo = ImageTk.PhotoImage(img)
+                img_label = tk.Label(movie_card, image=photo, bg='white')
+                img_label.image = photo # Save the reference so it doesn't vanish
+                img_label.pack(pady=5, padx=5)
+            except:
+                pass
+        
+        # Shorten big titles
+        if len(title) > 22 :
+            display_title = title[:19] + "..."
+        else:
+            display_title = title
+
+        tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
+        
+        # Buttons
+        tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+        tk.Button(movie_card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=5)
+        tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+
+        col += 1
+        if col >= max_columns:
             col = 0
-            max_columns = 4 #1 LINE SHOULD CONTAIN ONLY 4 MOVIES
+            row += 1
 
-            for movie in results[:10]: #DISPLAY 10 MOVIES
-                title = movie.get("title")
-                poster_path = movie.get("poster_path") #PATH FROM API DATABASE
-                
-                movie_card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
-                movie_card.grid(row=row, column=col, padx=15, pady=15)
-                
-                if poster_path:
-                    img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
-                    try:
-                        img_response = requests.get(img_url) #URL LINK
-                        img_data = img_response.content #ACTUAL IMAGE CONTENT
-                        img_data = Image.open(io.BytesIO(img_data)) #USING IO MODULE OPEN IMAGE(FILE HANDLER)
-                        img_data = img_data.resize((150, 225)) #RESIZE TO FIT WINDOW
-                        photo = ImageTk.PhotoImage(img_data) #FINAL
-                        img_label = tk.Label(movie_card, image=photo, bg='white')
-                        img_label.image = photo #VARIABLE TO STORE
-                        img_label.pack(pady=5, padx=5)
-                    except:
-                        pass
-                else:
-                    pass
-                #TITLE CONDITION FOR BIG MOVIE NAMES
-                if len(title) > 22 :
-                    title = title[:19] + "..."
-
-                tk.Label(movie_card, text=title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
-                col += 1
-                if col >= max_columns:
-                    col = 0
-                    row += 1
-                
-                 #SEE DETAILS BUTTON 
-                tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
-
-                #ADD REVIEW BUTTON
-                tk.Button(movie_card,text="Add Review",bg='black',fg='white',command=lambda m=movie: open_review_window(m)).pack(pady=5)
-
-                #ADD WATCHLIST BUTTON
-                tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
-    except :
-        pass
-
-    # Force tkinter to calculate the frame's new height, then update the canvas bounds
+    # Update the scrollbar
     scrollable_movie_frame.update_idletasks()
     canvas.configure(scrollregion=canvas.bbox("all"))
-
 #----------------------USER PROFILE--------------------------------------
 # GLOBAL PROFILE FRAME CREATION
 profile_frame = tk.Frame(base, bg='white', bd=2)
