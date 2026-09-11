@@ -15,8 +15,8 @@ TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid T
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '2101', 
-    'database': 'sandhya'
+    'password': 'charan123', 
+    'database': 'charan'
 }
 
 current_user = None
@@ -863,6 +863,158 @@ tk.Button(search_frame, text="Search Movie", command=trigger_search).pack(side=t
 tk.Button(search_frame, text="Show Trending", command=show_trending).pack(side=tk.LEFT, padx=10)
 tk.Button(search_frame,text="Recommended For You",bg='darkblue',fg='white',command=show_recommendations).pack(side=tk.LEFT, padx=10)
 tk.Button(search_frame,text="🎂 My Birthday Movies",bg='purple',fg='white',command=show_birthday_movies).pack(side=tk.LEFT, padx=10)
+
+
+# ---------------- ADVANCED FILTER BAR ----------------
+filter_frame = tk.Frame(dashboard_frame, bg='white')
+filter_frame.pack(pady=5)
+
+# 1. Genre Dropdown
+tk.Label(filter_frame, text="Genre:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+genre_options = ["All", "Action", "Sci-Fi", "Comedy", "Drama", "Horror", "Thriller", "Romance", "Animation", "Documentary"]
+genre_dropdown = ttk.Combobox(filter_frame, values=genre_options, state="readonly", width=12)
+genre_dropdown.set("All")
+genre_dropdown.pack(side=tk.LEFT, padx=4)
+
+# 2. Year Entry
+tk.Label(filter_frame, text="Year:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+year_entry = tk.Entry(filter_frame, width=6)
+year_entry.pack(side=tk.LEFT, padx=4)
+
+# 3. Minimum Rating Dropdown
+tk.Label(filter_frame, text="Min Rating:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+rating_options = ["Any", "5+", "6+", "7+", "8+"]
+rating_dropdown = ttk.Combobox(filter_frame, values=rating_options, state="readonly", width=8)
+rating_dropdown.set("Any")
+rating_dropdown.pack(side=tk.LEFT, padx=4)
+
+# 4. Sort By Dropdown
+tk.Label(filter_frame, text="Sort By:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+sort_mapping = {
+    "Most Popular": "popularity.desc",
+    "Highest Rated": "vote_average.desc",
+    "Newest First": "primary_release_date.desc"
+}
+sort_dropdown = ttk.Combobox(filter_frame, values=list(sort_mapping.keys()), state="readonly", width=14)
+sort_dropdown.set("Most Popular")
+sort_dropdown.pack(side=tk.LEFT, padx=4)
+
+# 5. Apply Filters Button
+tk.Button(filter_frame, text="Filter Movies", bg='darkblue', fg='white', font=('Arial', 10, 'bold'),
+          command=lambda: apply_movie_filters()).pack(side=tk.LEFT, padx=8)
+
+def apply_movie_filters():
+    # 1. Clear previous listings
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Finding matching movies...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label.grid(row=0, column=0, columnspan=4, pady=20)
+
+    # 2. Collect criteria from the UI
+    selected_genre = genre_dropdown.get()
+    entered_year = year_entry.get().strip()
+    selected_rating = rating_dropdown.get()
+    sort_choice = sort_dropdown.get()
+
+    # 3. Build the TMDb Discover query parameters
+    params = [
+        f"api_key={TMDB_API_KEY}",
+        f"sort_by={sort_mapping.get(sort_choice, 'popularity.desc')}",
+        "vote_count.gte=100"  # Excludes obscure titles with only 1 or 2 votes
+    ]
+
+    # Map Genre to ID
+    if selected_genre != "All" and selected_genre in tmdb_genre_ids:
+        params.append(f"with_genres={tmdb_genre_ids[selected_genre]}")
+
+    # Validate and append year
+    if entered_year.isdigit() and len(entered_year) == 4:
+        params.append(f"primary_release_year={entered_year}")
+
+    # Append Minimum Rating
+    if selected_rating != "Any":
+        min_score = selected_rating.replace("+", "")
+        params.append(f"vote_average.gte={min_score}")
+
+    url = f"https://api.themoviedb.org/3/discover/movie?{'&'.join(params)}"
+
+    # 4. Background Fetching
+    def worker():
+        try:
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                results = resp.json().get("results", [])[:12]
+
+                # Fetch posters concurrently
+                def fetch_poster(movie):
+                    path = movie.get("poster_path")
+                    if path:
+                        try:
+                            return requests.get(f"https://image.tmdb.org/t/p/w200{path}", timeout=5).content
+                        except:
+                            return None
+                    return None
+
+                with ThreadPoolExecutor(max_workers=10) as pool:
+                    images = list(pool.map(fetch_poster, results))
+
+                movies_data = list(zip(results, images))
+                base.after(0, render_filtered_movies, movies_data, loading_label)
+            else:
+                base.after(0, loading_label.destroy)
+        except Exception:
+            base.after(0, loading_label.destroy)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+def render_filtered_movies(movies_data, loading_label):
+    loading_label.destroy()
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+
+    if not movies_data:
+        tk.Label(scrollable_movie_frame, text="No movies matched your criteria.", font=('Arial', 14), bg='white').grid(row=0, column=0, columnspan=4, pady=20)
+        return
+
+    row, col, max_columns = 0, 0, 4
+
+    for movie, img_bytes in movies_data:
+        title = movie.get("title", "Unknown")
+        vote_avg = movie.get("vote_average", 0.0)
+
+        card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
+        card.grid(row=row, column=col, padx=12, pady=12)
+
+        # Poster Image
+        if img_bytes:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).resize((150, 225))
+                photo = ImageTk.PhotoImage(img)
+                lbl = tk.Label(card, image=photo, bg='white')
+                lbl.image = photo
+                lbl.pack(pady=5, padx=5)
+            except Exception:
+                pass
+
+        # Title
+        display_title = title if len(title) <= 20 else title[:17] + "..."
+        tk.Label(card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack()
+
+        # TMDb Rating Badge
+        tk.Label(card, text=f"★ {vote_avg:.1f} / 10", font=('Arial', 9, 'bold'), fg='#d4af37', bg='white').pack(pady=2)
+
+        # Action Buttons
+        tk.Button(card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+        tk.Button(card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+
+        col += 1
+        if col >= max_columns:
+            col = 0
+            row += 1
+
+    scrollable_movie_frame.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
 # ------SCROLLBAR SETUP---------
 #FRAME CREATION
 canvas_frame = tk.Frame(dashboard_frame, bg='white')
