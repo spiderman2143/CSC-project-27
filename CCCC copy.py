@@ -25,7 +25,7 @@ current_user = None
 def init_db():
     con = psq.connect(**db_config)
     cur = con.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS userdetails (fullname VARCHAR(30) NOT NULL, age INT, gender VARCHAR(10), email VARCHAR(50), username VARCHAR(50) PRIMARY KEY, password VARCHAR(20), bio VARCHAR(50),dob DATE)")
+    cur.execute("CREATE TABLE IF NOT EXISTS userdetails (fullname VARCHAR(30) NOT NULL,gender VARCHAR(10),age INT, email VARCHAR(50), username VARCHAR(50) PRIMARY KEY, password VARCHAR(20), bio VARCHAR(50),dob DATE)")
     cur.execute("CREATE TABLE IF NOT EXISTS admindetails (username VARCHAR(50) PRIMARY KEY, password VARCHAR(20))")
     cur.execute("CREATE TABLE IF NOT EXISTS usergenres (username VARCHAR(50) PRIMARY KEY, genre1 VARCHAR(20), genre2 VARCHAR(20), genre3 VARCHAR(20))")
     cur.execute("CREATE TABLE IF NOT EXISTS reviews(review_id INT AUTO_INCREMENT PRIMARY KEY,username VARCHAR(50),movie_name VARCHAR(100),"
@@ -38,21 +38,21 @@ def init_db():
 #FACILITATES SIGNUP PROCESS
 def user_signup():
     name = name_entry.get()
-    age = age_entry.get()
     gender = gender_var.get()
     email = email_entry.get()
     bio = bio_entry.get()
     dob = dob_entry.get()
+    dob_date = datetime.strptime(dob, "%Y-%m-%d").date()
+    today = datetime.now().date()
+    age = today.year - dob_date.year
+    if (today.month, today.day) < (dob_date.month, dob_date.day):
+        age = age - 1
     username = user_entry.get()
     password = pass_entry.get()
     confirm = confirm_entry.get()
     #EMPTY FIELDS CHECK
-    if not all([name, age, email,dob, username, password, confirm]):
+    if not all([name,email,dob, username, password, confirm]):
         messagebox.showerror("Error", "All fields required")
-        return
-    #AGE DIGIT CHECK
-    if not age.isdigit():
-        messagebox.showerror("Error", "Age must be a number")
         return
     #STRIPPING DATE TO FIT FORMAT
     try:
@@ -283,7 +283,7 @@ name_entry.pack()
 
 #AGE BOX
 tk.Label(signup_frame, text="Age", bg='white').pack()
-age_entry = tk.Entry(signup_frame, width=30)
+age_entry = tk.Entry(signup_frame, width=30, state="readonly")
 age_entry.pack()
 
 #GENDER BOX
@@ -306,9 +306,29 @@ bio_entry = tk.Entry(signup_frame, width=30)
 bio_entry.pack()
 
 #DATE OF BIRTH BOX
+def calculate_age(event=None):
+    dob = dob_entry.get()
+
+    try:
+        dob_date = datetime.strptime(dob, "%Y-%m-%d").date()
+        today = datetime.now().date()
+
+        age = today.year - dob_date.year
+
+        if (today.month, today.day) < (dob_date.month, dob_date.day):
+            age = age - 1
+
+        age_entry.config(state="normal")
+        age_entry.delete(0, tk.END)
+        age_entry.insert(0, str(age))
+        age_entry.config(state="readonly")
+
+    except:
+        pass
 tk.Label(signup_frame,text="Date of Birth",bg='white').pack()
 dob_entry = DateEntry(signup_frame,width=27,background='purple',foreground='white',borderwidth=2,date_pattern='yyyy-mm-dd')
 dob_entry.pack(pady=5)
+dob_entry.bind("<<DateEntrySelected>>", calculate_age)
 
 
 #USERNAME BOX
