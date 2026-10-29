@@ -15,8 +15,8 @@ TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid T
 db_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'charan123', 
-    'database': 'charan'
+    'password': '2101', 
+    'database': 'sandhya'
 }
 
 current_user = None
@@ -1007,6 +1007,7 @@ def render_filtered_movies(movies_data, loading_label):
         # Action Buttons
         tk.Button(card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
         tk.Button(card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+        tk.Button(card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=5)
 
         col += 1
         if col >= max_columns:
@@ -1122,7 +1123,7 @@ def load_api_movies(search_query=""):
     for widget in scrollable_movie_frame.winfo_children():
         widget.destroy()
 
-    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Relax and wait until we load en...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Relax and wait until we load entertainment...", font=('Arial', 14, 'bold'), bg='white')
     loading_label.grid(row=0, column=0, pady=20, padx=20)
 
     def fetch_data():

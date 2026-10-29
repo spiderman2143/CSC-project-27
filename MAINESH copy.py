@@ -1,0 +1,1404 @@
+import mysql.connector as psq
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+from PIL import Image, ImageTk
+import requests
+import io
+import threading 
+from tkcalendar import DateEntry
+from datetime import datetime 
+from concurrent.futures import ThreadPoolExecutor
+# ---------------- CONFIGURATION ----------------
+TMDB_API_KEY = "28e5e0639713f8c0e151cd61ed9f8f9a"  # Ensure this is your valid TMDb API key
+
+db_config = {
+    'host': 'localhost',
+    'user': 'root',
+    'password': '2101', 
+    'database': 'sandhya'
+}
+
+current_user = None
+
+# ---------------- DATABASE INITIALIZATION + TABLE CREATION----------------
+def init_db():
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS userdetails (fullname VARCHAR(30) NOT NULL,gender VARCHAR(10),age INT, email VARCHAR(50), username VARCHAR(50) PRIMARY KEY, password VARCHAR(20), bio VARCHAR(50),dob DATE)")
+    cur.execute("CREATE TABLE IF NOT EXISTS admindetails (username VARCHAR(50) PRIMARY KEY, password VARCHAR(20))")
+    cur.execute("CREATE TABLE IF NOT EXISTS usergenres (username VARCHAR(50) PRIMARY KEY, genre1 VARCHAR(20), genre2 VARCHAR(20), genre3 VARCHAR(20))")
+    cur.execute("CREATE TABLE IF NOT EXISTS reviews(review_id INT AUTO_INCREMENT PRIMARY KEY,username VARCHAR(50),movie_name VARCHAR(100),"
+"story INT,screenplay INT,acting INT,direction INT,music INT,visual_effects INT,entertainment INT,avg_rating FLOAT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS watchlist (username VARCHAR(50), movie_id INT, movie_name VARCHAR(100), poster_path VARCHAR(200))")
+    con.commit()
+    con.close()
+
+# ---------------- SIGNUP ----------------
+#FACILITATES SIGNUP PROCESS
+def user_signup():
+    name = name_entry.get()
+    gender = gender_var.get()
+    email = email_entry.get()
+    bio = bio_entry.get()
+    dob = dob_entry.get()
+    dob_date = datetime.strptime(dob, "%Y-%m-%d").date()
+    today = datetime.now().date()
+    age = today.year - dob_date.year
+    if (today.month, today.day) < (dob_date.month, dob_date.day):
+        age = age - 1
+    username = user_entry.get()
+    password = pass_entry.get()
+    confirm = confirm_entry.get()
+    #EMPTY FIELDS CHECK
+    if not all([name,email,dob, username, password, confirm]):
+        messagebox.showerror("Error", "All fields required")
+        return
+    #STRIPPING DATE TO FIT FORMAT
+    try:
+        datetime.strptime(dob, "%Y-%m-%d")
+    except ValueError:
+        messagebox.showerror("Error", "Invalid date of birth")
+        return
+    #LENGTH OF PWD>4 CHECK
+    if len(password)<= 4:
+        messagebox.showerror("Error", "Password must be > 4 characters")
+        return
+    #CONFIRM PWD CHECK
+    if password != confirm:
+        messagebox.showerror("Error", "Passwords do not match")
+        return
+    #INSERTING INTO SQL TABLE  
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("INSERT INTO userdetails (fullname, age, gender, email, username, password, bio,dob) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (name, age, gender, email, username, password, bio,dob))
+        con.commit()
+        con.close()
+
+        messagebox.showinfo("Success", "Account created!")
+        show_login_screen()
+    #IF USERNAME ALREADY EXISTS
+    except psq.IntegrityError:
+        messagebox.showerror("Error", "Username already exists!")
+
+# ---------------- ADMIN LOGIN ----------------
+#CHECKS DATA FROM SQL TABLE
+def checkadmin(username, password):
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT * FROM admindetails WHERE username=%s AND password=%s", (username, password))
+    result = cur.fetchone()
+    con.close()
+    return result 
+
+#FACILITATES ADMINLOGIN PROCESS
+def ADlogin_action():
+    user = admin_user.get()
+    pw = admin_pass.get()
+    #EMPTY FIELD CHECK
+    if not all([user,pw]):
+        messagebox.showerror("Error", "All fields required")
+        return
+    #LENGTH OF PWD>4 CHECK
+    if len(pw)<= 4:
+        messagebox.showerror("Error", "Password must be > 4 characters")
+        return
+    
+    if checkadmin(user, pw):
+        messagebox.showinfo("Success", "Admin Login successful!")
+        show_admin_dashboard()
+    else:
+        messagebox.showerror("Failed", "Invalid Admin Credentials")
+
+# ---------------- USER LOGIN ----------------
+#CHECKS DATA FROM SQL TABLE
+def checklogin(username, password):
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT * FROM userdetails WHERE username=%s AND password=%s", (username, password))
+    result = cur.fetchone()
+    con.close()
+    return result
+
+def checkiffirsttime(username):
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT * FROM usergenres WHERE username=%s", (username,))
+    result = cur.fetchone()
+    con.close()
+    return result
+
+#FACILITATES USERLOGIN PROCESS
+def login_action():
+    global current_user 
+    user = enteruser.get()
+    pw = enterpass.get()
+    #EMPTY FIELD CHECK
+    if not all([user,pw]):
+        messagebox.showerror("Error", "All fields required")
+        return
+    #LENGTH OF PWD>4 CHECK
+    if len(pw) <= 4:
+        messagebox.showerror("Error", "Password must be > 4 characters")
+        return
+
+    if checklogin(user, pw):
+        current_user = user 
+        if checkiffirsttime(user): #IF RESULT IS TRUE-GENRES ALREADY SELECTED-GO TO DASHBOARD
+            show_dashboard_screen()    
+        else:
+            show_genre_screen()  #RESULT IS FALSE-GENRES NOT SELECTED-GO TO GENRE SCREEN
+    else:
+        messagebox.showerror("Failed", "Invalid Username or Password")
+
+# ---------------- UI SETUP ----------------
+base = tk.Tk()
+base.title("Movie Discovery Platform")
+base.geometry("1200x800")
+
+#BACKGROUND PICTURE
+try:
+    img = Image.open("MOVIE.jpeg")
+    img = img.resize((1200, 800))# to fit geometry of page
+    bg_photo = ImageTk.PhotoImage(img)
+    bg_label = tk.Label(base, image=bg_photo)
+    bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+except:
+    pass
+
+# ---------------- FRAME SWITCH ----------------
+def show_signup_screen():
+    login_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place_forget()
+    admin_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
+    signup_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+def show_login_screen():
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place_forget()
+    admin_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
+    admin_dashboard_frame.place_forget()
+    login_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+def show_adminscreen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
+    admin_dashboard_frame.place_forget()
+    admin_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+def show_genre_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    dashboard_frame.place_forget()
+    admin_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    admin_dashboard_frame.place_forget()
+    my_reviews_frame.place_forget()
+    genre_frame.place(relx=0.5, rely=0.5, anchor='center')
+
+def show_dashboard_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    admin_dashboard_frame.place_forget()
+    my_reviews_frame.place_forget()
+    dashboard_frame.place(relx=0.5, rely=0.5, anchor='center')
+    welcome_label.config(text=f"Welcome back, {current_user}!")
+    load_api_movies() #connects the apimovie database and fetches movies
+
+def show_profile_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    dashboard_frame.place_forget()
+    admin_dashboard_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()     
+    profile_frame.place(relx=0.5, rely=0.5, anchor='center')
+    load_user_profile() #button to show the details
+
+
+# ---------------- LOGIN FRAME ----------------
+#FRAME CREATION AND TITLE
+login_frame = tk.Frame(base, bg='white', bd=2)
+tk.Label(login_frame, text="USER LOGIN", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+
+#USERNAME BOX
+tk.Label(login_frame, text="Username", font=('Arial', 15), bg='white').pack()
+enteruser = tk.Entry(login_frame, width=30)
+enteruser.pack(pady=10)
+
+#PASSWORD BOX
+tk.Label(login_frame, text="Password", font=('Arial', 15), bg='white').pack()
+enterpass = tk.Entry(login_frame, width=30, show="*")
+enterpass.pack(pady=10)
+
+#3 BUTTONS-LOGIN,SIGNUP,ADMIN
+tk.Button(login_frame, text="Login", command=login_action).pack(pady=20) #login button=go to logicaction fun to get user,pwd
+tk.Button(login_frame, text="Create Account", command=show_signup_screen).pack() #create account button=go to signup and get all details
+tk.Button(login_frame, text="Admin Login", command=show_adminscreen).pack(pady=5) #showadmin screen
+
+#---------------- ADMIN FRAME --------------
+#FRAME CREATION AND TITLE
+admin_frame = tk.Frame(base, bg='white', bd=2)
+tk.Label(admin_frame, text="ADMIN LOGIN", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+# ---------------- ADMIN DASHBOARD ----------------
+
+admin_dashboard_frame = tk.Frame(base, bg='white', bd=2)
+
+tk.Label(admin_dashboard_frame,text="🎬 ADMIN DASHBOARD",font=('Arial', 28, 'bold'),bg='white').pack(pady=25)
+tk.Label(admin_dashboard_frame,text="Manage users and reviews",font=('Arial', 14),bg='white').pack(pady=5)
+
+def admin_view_users():
+    for widget in admin_dashboard_frame.winfo_children():
+        widget.destroy()
+    tk.Label(admin_dashboard_frame, text="REGISTERED USERS", font=("Arial", 18, "bold"), bg="white").pack(pady=10)
+    tree = ttk.Treeview(admin_dashboard_frame, columns=("Name","Age","Gender","Email","Username","DOB"), show="headings", height=12)
+    for col in ("Name","Age","Gender","Email","Username","DOB"):
+        tree.heading(col, text=col)
+        tree.column(col, width=110)
+    tree.pack(padx=10, pady=10)
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT fullname, age, gender, email, username, dob FROM userdetails")
+    records = cur.fetchall()
+    con.close()
+    for row in records:
+        tree.insert("", tk.END, values=row)
+    tk.Button(admin_dashboard_frame, text="BACK", command=show_admin_dashboard).pack(pady=10)
+
+def admin_view_reviews():
+    for widget in admin_dashboard_frame.winfo_children():
+        widget.destroy()
+    tk.Label(admin_dashboard_frame, text="ALL REVIEWS", font=("Arial", 18, "bold"), bg="white").pack(pady=10)
+    tree = ttk.Treeview(admin_dashboard_frame, columns=("Username","Movie","Story","Screenplay","Acting","Direction","Music","VFX","Entertainment","Average"), show="headings", height=12)
+    for col in ("Username","Movie","Story","Screenplay","Acting","Direction","Music","VFX","Entertainment","Average"):
+        tree.heading(col, text=col)
+        tree.column(col, width=90)
+    tree.pack(padx=10, pady=10)
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT username, movie_name, story, screenplay, acting, direction, music, visual_effects, entertainment, avg_rating FROM reviews")
+    records = cur.fetchall()
+    con.close()
+    for row in records:
+        tree.insert("", tk.END, values=row)
+    tk.Button(admin_dashboard_frame, text="BACK", command=show_admin_dashboard).pack(pady=10)
+
+delete_user_entry = None
+def admin_delete_user():
+    username = delete_user_entry.get()
+    if username == "":
+        messagebox.showerror("Error", "Enter username")
+        return
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+    cur.execute("SELECT username FROM userdetails WHERE username=%s", (username,))
+    result = cur.fetchone()
+    if not result:
+        messagebox.showerror("Error", "User not found")
+        con.close()
+        return
+    confirm = messagebox.askyesno("Confirm", "Delete this user and all their data?")
+    if confirm:
+        cur.execute("DELETE FROM usergenres WHERE username=%s", (username,))
+        cur.execute("DELETE FROM reviews WHERE username=%s", (username,))
+        cur.execute("DELETE FROM watchlist WHERE username=%s", (username,))
+        cur.execute("DELETE FROM userdetails WHERE username=%s", (username,))
+        con.commit()
+        messagebox.showinfo("Success", "User deleted successfully")
+    con.close()
+
+def show_admin_dashboard():
+    global delete_user_entry
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    dashboard_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    my_reviews_frame.place_forget()
+    admin_frame.place_forget()
+    for widget in admin_dashboard_frame.winfo_children():
+        widget.destroy()
+    tk.Label(admin_dashboard_frame, text="⭐ ADMIN DASHBOARD", font=("Arial", 22, "bold"), bg="white").pack(pady=20)
+    tk.Button(admin_dashboard_frame, text="VIEW REGISTERED USERS", width=25, command=admin_view_users).pack(pady=10)
+    tk.Button(admin_dashboard_frame, text="VIEW ALL REVIEWS", width=25, command=admin_view_reviews).pack(pady=10)
+    tk.Label(admin_dashboard_frame, text="Delete User", bg="white", font=("Arial", 12, "bold")).pack(pady=(20,5))
+    delete_user_entry = tk.Entry(admin_dashboard_frame, width=30)
+    delete_user_entry.pack(pady=5)
+    tk.Button(admin_dashboard_frame, text="DELETE USER", width=25, command=admin_delete_user).pack(pady=10)
+    tk.Button(admin_dashboard_frame, text="LOGOUT", width=25, command=show_login_screen).pack(pady=20)
+    admin_dashboard_frame.place(relx=0.5, rely=0.5, anchor="center")
+#USERNAME BOX
+tk.Label(admin_frame, text="Username", font=('Arial', 15), bg='white').pack()
+admin_user = tk.Entry(admin_frame, width=30)
+admin_user.pack(pady=10)
+
+#PASSWORD BOX
+tk.Label(admin_frame, text="Password", font=('Arial', 15), bg='white').pack()
+admin_pass = tk.Entry(admin_frame, width=30, show="*")
+admin_pass.pack(pady=10)
+
+#2 BUTTONS-LOGIN,BACK
+tk.Button(admin_frame, text="Login", command=ADlogin_action).pack(pady=20)
+tk.Button(admin_frame, text="Back to Login", command=show_login_screen).pack()
+
+# ---------------- SIGNUP FRAME ----------------
+#FRAME CREATION AND TITLE
+signup_frame = tk.Frame(base, bg='white', bd=2)
+tk.Label(signup_frame, text="SIGN UP", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+
+#FULLNAME BOX
+tk.Label(signup_frame, text="Full Name", bg='white').pack()
+name_entry = tk.Entry(signup_frame, width=30)
+name_entry.pack()
+
+#AGE BOX
+tk.Label(signup_frame, text="Age", bg='white').pack()
+age_entry = tk.Entry(signup_frame, width=30, state="readonly")
+age_entry.pack()
+
+#GENDER BOX
+tk.Label(signup_frame, text="Gender", bg='white').pack()
+gender_var = tk.StringVar(value="Male")
+frame = tk.Frame(signup_frame, bg='white')
+frame.pack()
+tk.Radiobutton(frame, text="Male", variable=gender_var, value="Male", bg='white').pack(side="left")
+tk.Radiobutton(frame, text="Female", variable=gender_var, value="Female", bg='white').pack(side="left")
+tk.Radiobutton(frame, text="Other", variable=gender_var, value="Other", bg='white').pack(side="left")
+
+#EMAIL BOX
+tk.Label(signup_frame, text="Email", bg='white').pack()
+email_entry = tk.Entry(signup_frame, width=30)
+email_entry.pack()
+
+#BIO BOX
+tk.Label(signup_frame, text="Bio", bg='white').pack()
+bio_entry = tk.Entry(signup_frame, width=30)
+bio_entry.pack()
+
+#DATE OF BIRTH BOX
+def calculate_age(event=None):
+    dob = dob_entry.get()
+
+    try:
+        dob_date = datetime.strptime(dob, "%Y-%m-%d").date()
+        today = datetime.now().date()
+
+        age = today.year - dob_date.year
+
+        if (today.month, today.day) < (dob_date.month, dob_date.day):
+            age = age - 1
+
+        age_entry.config(state="normal")
+        age_entry.delete(0, tk.END)
+        age_entry.insert(0, str(age))
+        age_entry.config(state="readonly")
+
+    except:
+        pass
+tk.Label(signup_frame,text="Date of Birth",bg='white').pack()
+dob_entry = DateEntry(signup_frame,width=27,background='purple',foreground='white',borderwidth=2,date_pattern='yyyy-mm-dd')
+dob_entry.pack(pady=5)
+dob_entry.bind("<<DateEntrySelected>>", calculate_age)
+
+
+#USERNAME BOX
+tk.Label(signup_frame, text="Username", bg='white').pack()
+user_entry = tk.Entry(signup_frame, width=30)
+user_entry.pack()
+
+#PASSWORD BOX
+tk.Label(signup_frame, text="Password", bg='white').pack()
+pass_entry = tk.Entry(signup_frame, width=30, show="*")
+pass_entry.pack()
+
+#CONFIRM PASSWORD BOX
+tk.Label(signup_frame, text="Confirm Password", bg='white').pack()
+confirm_entry = tk.Entry(signup_frame, width=30, show="*")
+confirm_entry.pack()
+
+#2 BUTTONS-REGISTER,BACK
+tk.Button(signup_frame, text="Register", command=user_signup).pack(pady=10)
+tk.Button(signup_frame, text="Back to Login", command=show_login_screen).pack()
+
+# ---------------- BIRTHDAY MOVIES ----------------
+def show_birthday_movies():
+    # 1. CLEAR OLD MOVIES
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+
+    # 2. SHOW A FUNNY LOADING MESSAGE
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Sending 31 friends to the internet. Hold on...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label.grid(row=0, column=0, columnspan=4, pady=20)
+
+    # 3. THE HELPER (AND FRIENDS) WORKING IN THE BACKGROUND
+    def fetch_birthday_data():
+        try:
+            # Check the database for their birthday
+            con = psq.connect(**db_config)
+            cur = con.cursor()
+            cur.execute("SELECT dob FROM userdetails WHERE username=%s", (current_user,))
+            result = cur.fetchone()
+            con.close()
+
+            if not result or not result[0]:
+                base.after(0, lambda: messagebox.showerror("Error", "Date of birth not found."))
+                base.after(0, loading_label.destroy)
+                return
+
+            dob = result[0]
+            month = dob.month
+            day = dob.day
+            current_year = datetime.now().year
+            start_year = current_year - 30 
+
+            # Prepare all 31 internet links
+            urls = []
+            for year in range(start_year, current_year + 1):
+                date = f"{year}-{month:02d}-{day:02d}"
+                url = f"https://api.themoviedb.org/3/discover/movie?api_key={TMDB_API_KEY}&primary_release_date.gte={date}&primary_release_date.lte={date}&sort_by=popularity.desc"
+                urls.append(url)
+
+            # --- THE MAGIC FRIENDS TRICK ---
+            # This mini-function checks ONE link
+            def fetch_single_url(link):
+                try:
+                    resp = requests.get(link, timeout=5)
+                    if resp.status_code == 200:
+                        return resp.json().get("results", [])
+                except:
+                    return []
+                return []
+
+            # We unleash 20 helpers at the EXACT SAME TIME to check all 31 links!
+            all_movies = []
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                # 'executor.map' sends all the links to the helpers instantly
+                results_list = list(executor.map(fetch_single_url, urls))
+            
+            # Put all the found movies into one big pile
+            for res in results_list:
+                all_movies.extend(res)
+
+            # Remove duplicates and take only the top 10 movies
+            unique_movies = {movie["id"]: movie for movie in all_movies}
+            top_10_movies = list(unique_movies.values())[:10]
+
+            # --- SECOND FRIENDS TRICK FOR POSTERS ---
+            # Now we send 10 friends to download the 10 posters at the same time
+            def fetch_poster(movie):
+                img_data = None
+                poster_path = movie.get("poster_path")
+                if poster_path:
+                    img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+                    try:
+                        img_data = requests.get(img_url, timeout=5).content
+                    except:
+                        pass
+                return (movie, img_data)
+
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                movies_and_posters = list(executor.map(fetch_poster, top_10_movies))
+
+            # 4. HAND EVERYTHING TO THE CHEF (Tkinter)
+            base.after(0, render_birthday_movies, movies_and_posters, loading_label)
+
+        except Exception as e:
+            base.after(0, loading_label.destroy)
+
+
+    # 5. SEND THE HEAD HELPER TO START THE PROCESS
+    threading.Thread(target=fetch_birthday_data, daemon=True).start()
+
+
+# 6. THE CHEF DRAWS THE SCREEN (Main Thread)
+def render_birthday_movies(movies_and_posters, loading_label):
+    loading_label.destroy()
+
+    tk.Label(scrollable_movie_frame, text="🎂 Movies Released on your birthdayy!!!", font=('Arial', 20, 'bold'), bg='white').grid(row=0, column=0, columnspan=4, pady=20)
+
+    if not movies_and_posters:
+        tk.Label(scrollable_movie_frame, text="No movies found for your birthday.", font=('Arial', 14), bg='white').grid(row=1, column=0, columnspan=4, pady=20)
+        return
+
+    row, col, max_columns = 1, 0, 4
+
+    for movie, img_bytes in movies_and_posters:
+        title = movie.get("title", "Unknown")
+        
+        movie_card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
+        movie_card.grid(row=row, column=col, padx=15, pady=15)
+
+        # Draw the picture
+        if img_bytes:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).resize((150, 225))
+                photo = ImageTk.PhotoImage(img)
+                img_label = tk.Label(movie_card, image=photo, bg='white')
+                img_label.image = photo 
+                img_label.pack(pady=5)
+            except:
+                pass
+
+        # Shorten Title
+        display_title = title if len(title) <= 22 else title[:19] + "..."
+        tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=5)
+
+        # Release Date
+        release_date = movie.get("release_date", "Unknown")
+        tk.Label(movie_card, text=f"Released: {release_date}", font=('Arial', 9), bg='white').pack()
+
+        # Buttons
+        tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+        tk.Button(movie_card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=2)
+        tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+
+        col += 1
+        if col >= max_columns:
+            col = 0
+            row += 1
+
+    # Update scroll
+    scrollable_movie_frame.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+# ---------------- GENRE SELECTION FRAME ----------------
+#FRAME CREATION,TITLE,MESSAGE
+genre_frame = tk.Frame(base, bg='white', bd=2)
+tk.Label(genre_frame, text="SELECT GENRES", font=('Arial', 30, 'bold'), bg='white').pack(pady=20)
+tk.Label(genre_frame, text="Pick your top 3 favorite movie genres", font=('Arial', 15), bg='white').pack(pady=10)
+
+movie_genres = ["Action", "Sci-Fi", "Comedy", "Drama", "Horror", "Thriller", "Romance", "Animation", "Documentary"]
+genre_vars = {} #STORES KEY:GENRES,VALUE:1 OR 0
+checkbox_container = tk.Frame(genre_frame, bg='white')
+checkbox_container.pack(pady=10)
+for genre in movie_genres:
+    var = tk.IntVar() #CONVERTS SELECTED BOX TO NUMBER-1 FOR SELECTED,0 FOR NOT SELECTED 
+    genre_vars[genre] = var 
+    chk = tk.Checkbutton(checkbox_container, text=genre, variable=var, bg='white', font=('Arial', 12))
+    chk.pack(anchor='w', pady=2)
+
+def submit_genres():
+    selected_genres = [] #STORES 3 SELECTED GENRES
+    for genre_name in genre_vars:
+        if genre_vars[genre_name].get() == 1: #IF VALUE IS 1,APPEND TO SELECTED GENRES
+            selected_genres.append(genre_name) 
+    # ONLY 3 GENRES CHECK
+    if len(selected_genres) != 3:
+        messagebox.showerror("Error", "Please select exactly 3 genres")
+    else:
+        #INSERT DATA INTO SQL TABLE
+        try:
+            con = psq.connect(**db_config)
+            cur = con.cursor()
+            cur.execute("INSERT INTO usergenres (username, genre1, genre2, genre3) VALUES (%s, %s, %s, %s)",
+                (current_user, selected_genres[0], selected_genres[1], selected_genres[2]))
+            con.commit()
+            con.close()
+            messagebox.showinfo("Success", "Genres saved successfully!")
+            show_dashboard_screen() 
+        except:
+            pass
+
+tk.Button(genre_frame, text="Continue", command=submit_genres).pack(pady=20)
+
+# ---------------- WATCHLIST SYSTEM ----------------
+watchlist_frame = tk.Frame(base, bg='white', bd=2)
+#FUNCTION TO RUN IF WATCHLIST BUTTON IS CLICKED
+def add_to_watchlist(movie):
+    movie_id = movie.get("id") #ID IN TMDB
+    title = movie.get("title") #TITLE
+    poster = movie.get("poster_path") #PHOTOIMG
+
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        
+        #CHECKING IF ALREADY ADDED IN THE TABLE 
+        cur.execute("SELECT * FROM watchlist WHERE username=%s AND movie_id=%s", (current_user, movie_id))
+        if cur.fetchone(): #IF ONE REC IS FETCHED-DONT ADD - DISPLAY ALREADY THERE
+            messagebox.showinfo("Info", f"'{title}' is already in your Watchlist!")
+        else: #IF NOT- ADD IN THE TABLE
+            cur.execute("INSERT INTO watchlist (username, movie_id, movie_name, poster_path) VALUES (%s, %s, %s, %s)",
+                        (current_user, movie_id, title, poster))
+            con.commit()
+            messagebox.showinfo("Success", f"Added '{title}' to Watchlist!")
+        con.close()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not add to watchlist: {e}")
+
+#FUNCTION TO RUN IF U WANT TO REMOVE A MOVIE
+def remove_from_watchlist(movie_id):
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("DELETE FROM watchlist WHERE username=%s AND movie_id=%s", (current_user, movie_id)) 
+        con.commit()
+        con.close()
+        messagebox.showinfo("Success", "Removed from Watchlist")
+        show_watchlist_screen() # SHOW AFTER UPDATION 
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not remove movie: {e}")
+
+# ---------------- MY REVIEWS SYSTEM ----------------
+my_reviews_frame = tk.Frame(base, bg='white', bd=2)
+#DELETING REVIEWS
+def delete_review(movie_name):
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("DELETE FROM reviews WHERE username=%s AND movie_name=%s", (current_user, movie_name))
+        con.commit()
+        con.close()
+        messagebox.showinfo("Success", f"Review for '{movie_name}' deleted!")
+        show_my_reviews_screen() # Refresh the screen
+    except Exception as e:
+        pass
+
+def show_my_reviews_screen():
+    # Hide all other frames
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    dashboard_frame.place_forget()
+    profile_frame.place_forget()
+    watchlist_frame.place_forget()
+    
+    # Place My Reviews Frame
+    my_reviews_frame.place(relx=0.5, rely=0.5, anchor='center', relwidth=0.9, relheight=0.9)
+    
+    # Clear old widgets
+    for widget in my_reviews_frame.winfo_children():
+        widget.destroy()
+
+    # Titles and Back Button
+    tk.Label(my_reviews_frame, text="⭐ MY REVIEWS", font=('Arial', 24, 'bold'), bg='white').pack(pady=10)
+    tk.Button(my_reviews_frame, text="Back to Dashboard", font=('Arial', 12, 'bold'), bg='black', fg='white', command=show_dashboard_screen).pack(pady=5)
+
+    # Scrollbar Setup
+    rev_canvas_frame = tk.Frame(my_reviews_frame, bg='white')
+    rev_canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+    rev_canvas = tk.Canvas(rev_canvas_frame, bg='white')
+    rev_scrollbar = ttk.Scrollbar(rev_canvas_frame, orient="vertical", command=rev_canvas.yview)
+    rev_scrollable_frame = tk.Frame(rev_canvas, bg='white')
+    
+    rev_canvas.create_window((0, 0), window=rev_scrollable_frame, anchor="nw") 
+    rev_canvas.configure(yscrollcommand=rev_scrollbar.set)
+    rev_canvas.pack(side="left", fill="both", expand=True)
+    rev_scrollbar.pack(side="right", fill="y")
+
+    # Fetch from TABLE
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("SELECT movie_name, story, screenplay, acting, direction, music, visual_effects, entertainment, avg_rating FROM reviews WHERE username=%s", (current_user,))
+        user_reviews = cur.fetchall() #LIST OF TUPLES CONTAINING EACH MOVIE
+        con.close()
+
+        if not user_reviews: #EMPTY
+            tk.Label(rev_scrollable_frame, text="You haven't reviewed any movies yet!", font=('Arial', 14), bg='white').pack(pady=40, padx=40)
+            return
+
+        row, col, max_columns = 0, 0, 3 # Display 3 cards per row
+        
+        # Build Review Cards
+        for rev in user_reviews: #REV IS A TUPLES
+            m_name, st, sc, ac, dr, mu, ve, en, avg = rev #PARAMETERS UNPACK
+            #SHOWING AS CARD
+            card = tk.Frame(rev_scrollable_frame, bg='lightgrey', bd=1, relief="solid", padx=15, pady=15)
+            card.grid(row=row, column=col, padx=20, pady=20, sticky="nsew")
+
+            # Limit title length if too long
+            display_title = m_name if len(m_name) <= 22 else m_name[:19] + "..."
+            tk.Label(card, text=display_title, font=('Arial', 14, 'bold'), bg='lightgrey').pack(pady=(0, 5))
+            
+            # Average Rating
+            tk.Label(card, text=f"Overall: {round(avg, 1)} ★", font=('Arial', 12, 'bold'), fg='red', bg='lightgrey').pack(pady=5)
+
+            # Detailed Breakdown-PARAMETERS
+            details_text = f"Story: {st} | Screenplay: {sc} | Acting: {ac}\nDirection: {dr} | Music: {mu}\nVisuals: {ve} | Entertainment: {en}"
+            tk.Label(card, text=details_text, font=('Arial', 10), bg='lightgrey', justify=tk.CENTER).pack(pady=10)
+
+            # Delete Button
+            tk.Button(card, text="Delete Review", bg='red', fg='white', command=lambda m=m_name: delete_review(m)).pack(pady=5)
+
+            # Move to next column
+            col += 1
+            if col >= max_columns:
+                col = 0
+                row += 1
+
+        # Update scrollable region
+        rev_scrollable_frame.update_idletasks()
+        rev_canvas.configure(scrollregion=rev_canvas.bbox("all"))
+
+    except Exception as e:
+        pass
+#-----------------------WATCHLIST----------------------------
+def show_watchlist_screen():
+    login_frame.place_forget()
+    signup_frame.place_forget()
+    genre_frame.place_forget()
+    admin_frame.place_forget()
+    dashboard_frame.place_forget()
+    watchlist_frame.place(relx=0.5, rely=0.5, anchor='center', relwidth=0.9, relheight=0.9)
+    for widget in watchlist_frame.winfo_children():
+            widget.destroy()
+    tk.Label(watchlist_frame, text="📺 MY WATCHLIST", font=('Arial', 24, 'bold'), bg='white').pack(pady=10)
+    tk.Button(watchlist_frame, text="Back to Dashboard", font=('Arial', 12, 'bold'), bg='black', fg='white', command=show_dashboard_screen).pack(pady=5)
+
+# SCROLLBAR
+    wl_canvas_frame = tk.Frame(watchlist_frame, bg='white')
+    wl_canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+    wl_canvas = tk.Canvas(wl_canvas_frame, bg='white')
+    wl_scrollbar = ttk.Scrollbar(wl_canvas_frame, orient="vertical", command=wl_canvas.yview)
+    wl_scrollable_frame = tk.Frame(wl_canvas, bg='white')
+    
+    wl_canvas.create_window((0, 0), window=wl_scrollable_frame, anchor="nw") 
+    wl_canvas.configure(yscrollcommand=wl_scrollbar.set)
+    wl_canvas.pack(side="left", fill="both", expand=True)
+    wl_scrollbar.pack(side="right", fill="y")
+
+    #CHECKING IF WATCHLIST IS EMPTY
+    try:
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        cur.execute("SELECT movie_id, movie_name, poster_path FROM watchlist WHERE username=%s", (current_user,))
+        saved_movies = cur.fetchall()
+        con.close()
+
+        if not saved_movies:
+            tk.Label(wl_scrollable_frame, text="Your watchlist is empty.Add something!!!", font=('Arial', 14), bg='white').pack(pady=40, padx=40)
+            return
+
+        row, col, max_columns = 0, 0, 4
+        for movie_id, title, poster_path in saved_movies:
+            movie_card = tk.Frame(wl_scrollable_frame, bg='white', bd=1, relief="solid")
+            movie_card.grid(row=row, column=col, padx=15, pady=15)
+
+            if poster_path:
+                img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+                try:
+                    img_response = requests.get(img_url)
+                    img_data = Image.open(io.BytesIO(img_response.content)).resize((150, 225))
+                    photo = ImageTk.PhotoImage(img_data)
+                    img_label = tk.Label(movie_card, image=photo, bg='white')
+                    img_label.image = photo 
+                    img_label.pack(pady=5, padx=5)
+                except:
+                    pass
+            if len(title) > 22:
+                display_title = title[:19] + "..." 
+            else:
+                display_title = title
+            
+            tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
+            tk.Button(movie_card, text="Remove", bg='red', fg='white', command=lambda m_id=movie_id: remove_from_watchlist(m_id)).pack(pady=10)
+            
+
+            col += 1
+            if col >= max_columns:
+                col = 0
+                row += 1
+
+        wl_scrollable_frame.update_idletasks()
+        wl_canvas.configure(scrollregion=wl_canvas.bbox("all"))
+
+    except Exception as e:
+        tk.Label(wl_scrollable_frame, text=f"Error loading watchlist: {e}", bg='white').pack()
+
+# ---------------- DASHBOARD ----------------
+dashboard_frame = tk.Frame(base, bg='white', bd=2, padx=40, pady=40)
+
+# 1. Create a single horizontal Header Frame
+header_frame = tk.Frame(dashboard_frame, bg='white')
+header_frame.pack(fill='x', pady=10) # fill='x' forces it to span the whole width
+
+# 2. Put the Welcome Label on the LEFT side of the header
+welcome_label = tk.Label(header_frame, text="Welcome to the Movie Platform!", font=('Arial', 24, 'bold'), bg='white')
+welcome_label.pack(side='left')
+
+# 3. Create a Navigation Frame on the RIGHT side of the header
+nav_frame = tk.Frame(header_frame, bg='white')
+nav_frame.pack(side='right')
+
+# 4. Pack the buttons inside the Nav Frame (they will line up perfectly)
+profile_btn = tk.Button(nav_frame, text="👤 Profile", font=('Arial', 11, 'bold'), bg='black', fg='white', cursor='hand2', command=show_profile_screen)
+profile_btn.pack(side='right', padx=5)
+
+watchlist_btn = tk.Button(nav_frame, text="📺 Watchlist", font=('Arial', 11, 'bold'), bg='green', fg='white', cursor='hand2', command=show_watchlist_screen)
+watchlist_btn.pack(side='right', padx=5)
+
+my_reviews_btn = tk.Button(nav_frame, text="⭐ My Reviews", font=('Arial', 11, 'bold'), bg='gold', fg='black', cursor='hand2', command=show_my_reviews_screen)
+my_reviews_btn.pack(side='right', padx=5)
+
+#---------------------SEARCH BAR-------------------
+search_frame = tk.Frame(dashboard_frame, bg='white')
+search_frame.pack(pady=10)
+#SEARCH BOX
+search_entry = tk.Entry(search_frame, width=20, font=('Arial', 12))
+search_entry.pack(side=tk.LEFT, padx=10)
+
+#TO SEARCH A PARTCULAR MOVIE-Search movie button
+def trigger_search():
+    query = search_entry.get().strip()
+    load_api_movies(query)
+
+#TO SHOW TRENDING MOVIES GENERAL-Show trending button
+def show_trending():
+    search_entry.delete(0, tk.END)
+    load_api_movies("")
+
+#TO SHOW RECOMMENDATION BASED ON SELECTED GENRES-Show recommendation button
+tmdb_genre_ids = {"Action": 28,"Sci-Fi": 878,"Comedy": 35,"Drama": 18,"Horror": 27,"Thriller": 53,"Romance": 10749,"Animation": 16,"Documentary": 99}
+def show_recommendations():
+    #CLEAR OLD MOVIES
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+    try:
+        #CONNECT DATABASE
+        con = psq.connect(**db_config)
+        cur = con.cursor()
+        #FETCH USER GENRES
+        cur.execute("SELECT genre1, genre2, genre3 FROM usergenres WHERE username=%s",(current_user,))
+        genres = cur.fetchone() #TUPLE CONTAINING 3 GENRES
+        genres=list(genres) #CONVERTING TO LIST
+        con.close()
+
+        #CONVERT GENRES TO TMDB IDS
+        genre_ids = []
+        for genre in genres: #ITERATING THRU LIST
+                genre_ids.append(str(tmdb_genre_ids[genre])) #ADDING GENREID FOR PARTICULAR GENRE
+
+        # JOIN IDS-FORMAT NEEDED FOR TMDB
+        genre_string = ",".join(genre_ids)
+
+        # TMDB DISCOVER API
+        url = (f"https://api.themoviedb.org/3/discover/movie?"f"api_key={TMDB_API_KEY}"f"&with_genres={genre_string}")
+        response = requests.get(url)
+
+        if response.status_code == 200: #WHEN SITE RUNS AND GIVES OUTPUT-200 DEFAULT STATUS CODE
+            data = response.json() #data IS DICT WITH KEY-REQUESTS AND ENTIRE MOVIE LIST-VALUE
+            results = data.get("results") #results IS ENTIRE MOVIE LIST
+
+            row = 0
+            col = 0
+            max_columns = 4 #1 LINE SHOULD CONTAIN ONLY 4 MOVIES
+            for movie in results[:10]: #DISPLAY 10 MOVIES
+                title = movie.get("title")
+                poster_path = movie.get("poster_path") #PATH FROM API DATABASE
+
+                movie_card = tk.Frame(scrollable_movie_frame,bg='white',bd=1,relief="solid")
+                movie_card.grid(row=row,column=col,padx=15,pady=15)
+
+                img_url = f"https://image.tmdb.org/t/p/w200{poster_path}" 
+
+                try:
+                    img_response = requests.get(img_url) #URL LINK
+                    img_data = img_response.content #ACTUAL IMAGE CONTENT
+                    img_data = Image.open(io.BytesIO(img_data)) #USING IO MODULE OPEN IMAGE(FILE HANDLER)
+                    img_data = img_data.resize((150, 225)) #RESIZE TO FIT WINDOW
+                    photo = ImageTk.PhotoImage(img_data) #FINAL
+
+                    img_label = tk.Label(movie_card,image=photo,bg='white')
+                    img_label.image = photo #VARIABLE TO STORE
+                    img_label.pack(pady=5)
+
+                except:
+                        pass
+
+                #TITLE CONDITION FOR BIG MOVIE NAMES
+                if len(title) > 22:
+                    title = title[:19] + "..."
+
+                tk.Label(movie_card,text=title,font=('Arial', 10, 'bold'),bg='white').pack(pady=(0,5))
+                col += 1
+                if col >= max_columns:
+                    col = 0
+                    row += 1
+
+                # REVIEW BUTTON
+                tk.Button(movie_card,text="Add Review",bg='black',fg='white',cursor='hand2',command=lambda m=movie: open_review_window(m)).pack(pady=5)
+                #SEE DETAILS BUTTON 
+                tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+
+    except Exception as e:
+        pass
+
+    scrollable_movie_frame.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+#3 BUTTONS=SEARCHMOVIE,SHOWTRENDING,SHOWRECOMMENDATION
+tk.Button(search_frame, text="Search Movie", command=trigger_search).pack(side=tk.LEFT)
+tk.Button(search_frame, text="Show Trending", command=show_trending).pack(side=tk.LEFT, padx=10)
+tk.Button(search_frame,text="Recommended For You",bg='darkblue',fg='white',command=show_recommendations).pack(side=tk.LEFT, padx=10)
+tk.Button(search_frame,text="🎂 My Birthday Movies",bg='purple',fg='white',command=show_birthday_movies).pack(side=tk.LEFT, padx=10)
+
+
+# ---------------- ADVANCED FILTER BAR ----------------
+filter_frame = tk.Frame(dashboard_frame, bg='white')
+filter_frame.pack(pady=5)
+
+# 1. Genre Dropdown
+tk.Label(filter_frame, text="Genre:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+genre_options = ["All", "Action", "Sci-Fi", "Comedy", "Drama", "Horror", "Thriller", "Romance", "Animation", "Documentary"]
+genre_dropdown = ttk.Combobox(filter_frame, values=genre_options, state="readonly", width=12)
+genre_dropdown.set("All")
+genre_dropdown.pack(side=tk.LEFT, padx=4)
+
+# 2. Year Entry
+tk.Label(filter_frame, text="Year:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+year_entry = tk.Entry(filter_frame, width=6)
+year_entry.pack(side=tk.LEFT, padx=4)
+
+# 3. Minimum Rating Dropdown
+tk.Label(filter_frame, text="Min Rating:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+rating_options = ["Any", "5+", "6+", "7+", "8+"]
+rating_dropdown = ttk.Combobox(filter_frame, values=rating_options, state="readonly", width=8)
+rating_dropdown.set("Any")
+rating_dropdown.pack(side=tk.LEFT, padx=4)
+
+# 4. Sort By Dropdown
+tk.Label(filter_frame, text="Sort By:", bg='white', font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=4)
+sort_mapping = {
+    "Most Popular": "popularity.desc",
+    "Highest Rated": "vote_average.desc",
+    "Newest First": "primary_release_date.desc"
+}
+sort_dropdown = ttk.Combobox(filter_frame, values=list(sort_mapping.keys()), state="readonly", width=14)
+sort_dropdown.set("Most Popular")
+sort_dropdown.pack(side=tk.LEFT, padx=4)
+
+# 5. Apply Filters Button
+tk.Button(filter_frame, text="Filter Movies", bg='darkblue', fg='white', font=('Arial', 10, 'bold'),
+          command=lambda: apply_movie_filters()).pack(side=tk.LEFT, padx=8)
+
+def apply_movie_filters():
+    # 1. Clear previous listings
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Finding matching movies...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label.grid(row=0, column=0, columnspan=4, pady=20)
+
+    # 2. Collect criteria from the UI
+    selected_genre = genre_dropdown.get()
+    entered_year = year_entry.get().strip()
+    selected_rating = rating_dropdown.get()
+    sort_choice = sort_dropdown.get()
+
+    # 3. Build the TMDb Discover query parameters
+    params = [
+        f"api_key={TMDB_API_KEY}",
+        f"sort_by={sort_mapping.get(sort_choice, 'popularity.desc')}",
+        "vote_count.gte=100"  # Excludes obscure titles with only 1 or 2 votes
+    ]
+
+    # Map Genre to ID
+    if selected_genre != "All" and selected_genre in tmdb_genre_ids:
+        params.append(f"with_genres={tmdb_genre_ids[selected_genre]}")
+
+    # Validate and append year
+    if entered_year.isdigit() and len(entered_year) == 4:
+        params.append(f"primary_release_year={entered_year}")
+
+    # Append Minimum Rating
+    if selected_rating != "Any":
+        min_score = selected_rating.replace("+", "")
+        params.append(f"vote_average.gte={min_score}")
+
+    url = f"https://api.themoviedb.org/3/discover/movie?{'&'.join(params)}"
+
+    # 4. Background Fetching
+    def worker():
+        try:
+            resp = requests.get(url, timeout=5)
+            if resp.status_code == 200:
+                results = resp.json().get("results", [])[:12]
+
+                # Fetch posters concurrently
+                def fetch_poster(movie):
+                    path = movie.get("poster_path")
+                    if path:
+                        try:
+                            return requests.get(f"https://image.tmdb.org/t/p/w200{path}", timeout=5).content
+                        except:
+                            return None
+                    return None
+
+                with ThreadPoolExecutor(max_workers=10) as pool:
+                    images = list(pool.map(fetch_poster, results))
+
+                movies_data = list(zip(results, images))
+                base.after(0, render_filtered_movies, movies_data, loading_label)
+            else:
+                base.after(0, loading_label.destroy)
+        except Exception:
+            base.after(0, loading_label.destroy)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+def render_filtered_movies(movies_data, loading_label):
+    loading_label.destroy()
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+
+    if not movies_data:
+        tk.Label(scrollable_movie_frame, text="No movies matched your criteria.", font=('Arial', 14), bg='white').grid(row=0, column=0, columnspan=4, pady=20)
+        return
+
+    row, col, max_columns = 0, 0, 4
+
+    for movie, img_bytes in movies_data:
+        title = movie.get("title", "Unknown")
+        vote_avg = movie.get("vote_average", 0.0)
+
+        card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
+        card.grid(row=row, column=col, padx=12, pady=12)
+
+        # Poster Image
+        if img_bytes:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).resize((150, 225))
+                photo = ImageTk.PhotoImage(img)
+                lbl = tk.Label(card, image=photo, bg='white')
+                lbl.image = photo
+                lbl.pack(pady=5, padx=5)
+            except Exception:
+                pass
+
+        # Title
+        display_title = title if len(title) <= 20 else title[:17] + "..."
+        tk.Label(card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack()
+
+        # TMDb Rating Badge
+        tk.Label(card, text=f"★ {vote_avg:.1f} / 10", font=('Arial', 9, 'bold'), fg='#d4af37', bg='white').pack(pady=2)
+
+        # Action Buttons
+        tk.Button(card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+        tk.Button(card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+        tk.Button(card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=5)
+
+        col += 1
+        if col >= max_columns:
+            col = 0
+            row += 1
+
+    scrollable_movie_frame.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+# ------SCROLLBAR SETUP---------
+#FRAME CREATION
+canvas_frame = tk.Frame(dashboard_frame, bg='white')
+canvas_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+canvas = tk.Canvas(canvas_frame, bg='white')
+scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)#SCROLL VERTICALLY(YVIEW)
+scrollable_movie_frame = tk.Frame(canvas, bg='white')
+
+canvas.create_window((0, 0), window=scrollable_movie_frame, anchor="nw") #AS WE SCROLL DOWN-FRAME GETS CREATED
+canvas.configure(yscrollcommand=scrollbar.set)
+
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y") #TOWARDS THE EXTREME RIGHT OF PAGE
+
+#-------------REVIEW SYSTEM-----------------------
+def open_review_window(movie):
+    movie_name = movie.get("title")
+    #SIDE WINDOW review_win
+    review_win = tk.Toplevel(base)
+    review_win.title("Movie Review")
+    review_win.geometry("500x700")
+    review_win.config(bg='white')
+
+    #MOVIE TITLE HEADING
+    tk.Label(review_win,text=movie_name,font=('Arial', 20, 'bold'),bg='white').pack(pady=20)
+
+    parameters = ["Story","Screenplay","Acting","Direction","Music","Visual Effects","Entertainment"]
+    #DICTIONARY THAT HAS KEY:PARAMETERS,VALUE:RATING IN NUMBER
+    rating_vars = {}
+    for param in parameters:
+        tk.Label(review_win,text=param,font=('Arial', 14),bg='white').pack() #DISPLAYS PARAMETER 
+        var = tk.IntVar() #STORES STAR VALUE AS NUMBER
+        rating_vars[param] = var 
+
+        #STAR BULIDING
+        star_frame = tk.Frame(review_win,bg='#1e1e1e',padx=10,pady=5)
+        star_frame.pack(pady=5)
+        for i in range(1, 6):
+            #INSIDE STARFRAME,TEXT IS STAR,VARIABLE VAR(NUMBER STORAGE),i VALUE FOR EACH STAR,INDICATORON REMOVES CIRCLE
+            tk.Radiobutton(star_frame,text="★",variable=var,value=i,indicatoron=0,width=3,font=('Arial', 14),bg='gold').pack(side='left', padx=2)
+
+    def save_review():
+        #GETS VALUE FROM EACH KEY IN DICT-VAR-INTVAR
+        story = rating_vars["Story"].get()
+        screenplay = rating_vars["Screenplay"].get()
+        acting = rating_vars["Acting"].get()
+        direction = rating_vars["Direction"].get()
+        music = rating_vars["Music"].get()
+        visual = rating_vars["Visual Effects"].get()
+        entertainment = rating_vars["Entertainment"].get()
+
+        total = story +screenplay +acting +direction +music +visual + entertainment
+        avg = total / 7
+
+        #INSERT DATA INTO SQL TABLE
+        try:
+            con = psq.connect(**db_config)
+            cur = con.cursor()
+            cur.execute("INSERT INTO reviews(username,movie_name,story,screenplay,acting,direction,music,visual_effects,entertainment,avg_rating)"
+            "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(current_user,movie_name,story,screenplay,acting,direction,music,visual,entertainment,avg))
+            con.commit()
+            con.close()
+
+            #DISPLAYS SUCCESS MSG BY ROUNDING OFF AVG RATING TO 1 DECIMAL
+            messagebox.showinfo("Success",f"Review Saved!\nAverage Rating: {round(avg,1)} ★")
+            review_win.destroy()
+
+        except:
+            pass
+
+    tk.Button(review_win,text="Submit Review",font=('Arial', 14, 'bold'),bg='red',fg='white',command=save_review).pack(pady=20)
+
+#-------------MOVIE DETAILS SYSTEM-----------------------
+def open_details_window(movie):
+    #GETTING DATA FROM API 
+    title = movie.get("title")
+    overview = movie.get("overview" )
+    release_date = movie.get("release_date" )
+    
+    #SIDE WINDOW details_win
+    details_win = tk.Toplevel(base)
+    details_win.title(f"{title} - Details")
+    details_win.geometry("600x400")
+    details_win.config(bg='white')
+    
+    #MOVIE TITLE
+    tk.Label(details_win, text=title, font=('Arial', 20, 'bold'), bg='white', wraplength=550).pack(pady=15)
+    
+    #CREATING INFOFRAME IN DETAILS WIN
+    info_frame = tk.Frame(details_win, bg='white')
+    info_frame.pack(pady=5)
+    # ADDING RELEASE DATE IN THAT
+    tk.Label(info_frame, text=f"Release Date: {release_date}", font=('Arial', 12, 'bold'), bg='white').pack(side=tk.LEFT, padx=20)
+    
+    #MOVIE DESCRIPTION
+    tk.Label(details_win, text="Synopsis:", font=('Arial', 14, 'bold'), bg='white').pack(pady=(15, 5))
+    tk.Message(details_win, text=overview, font=('Arial', 12), bg='white', width=550, justify=tk.CENTER).pack(pady=5)
+    
+    #CLOSE BUTTON
+    tk.Button(details_win, text="Close", font=('Arial', 12, 'bold'), bg='red', fg='white', command=details_win.destroy).pack(pady=20)
+
+# FETCH MOVIE AND DISPLAY IN GRID
+def load_api_movies(search_query=""):
+    for widget in scrollable_movie_frame.winfo_children():
+        widget.destroy()
+
+    loading_label = tk.Label(scrollable_movie_frame, text="⏳ Relax and wait until we load entertainment...", font=('Arial', 14, 'bold'), bg='white')
+    loading_label.grid(row=0, column=0, pady=20, padx=20)
+
+    def fetch_data():
+        if search_query == "":
+            url = f"https://api.themoviedb.org/3/trending/movie/day?api_key={TMDB_API_KEY}"
+        else:
+            url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_query}"
+
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                results = response.json().get("results", [])[:10]
+                
+                movies_data = [] # We will put the movie info and raw image data here
+                
+                # The helper fetches the movie info AND downloads the posters
+                for movie in results:
+                    img_data = None
+                    poster_path = movie.get("poster_path")
+                    if poster_path:
+                        img_url = f"https://image.tmdb.org/t/p/w200{poster_path}"
+                        try:
+                            # We just download the raw bytes, we don't draw it yet!
+                            img_response = requests.get(img_url)
+                            img_data = img_response.content 
+                        except:
+                            pass
+                    movies_data.append((movie, img_data))
+
+                # 4. HAND IT BACK TO TKINTER
+                # base.after(0, ...) tells Tkinter to run 'render_movies' immediately
+                base.after(0, render_movies, movies_data, loading_label)
+        except Exception as e:
+            pass # You could use base.after here to show an error label too!
+
+    # 5. SEND THE HELPER TO WORK!
+    # daemon=True means if you close the app, the helper stops immediately.
+    threading.Thread(target=fetch_data, daemon=True).start()
+
+
+# 6. THE CHEF DRAWS THE SCREEN (Main Thread)
+# This function is called by the radio (base.after) once the helper is done.
+def render_movies(movies_data, loading_label):
+    loading_label.destroy() # Remove the "Loading..." message
+
+    row, col, max_columns = 0, 0, 4 
+
+    for movie, img_bytes in movies_data: 
+        title = movie.get("title")
+        
+        movie_card = tk.Frame(scrollable_movie_frame, bg='white', bd=1, relief="solid")
+        movie_card.grid(row=row, column=col, padx=15, pady=15)
+        
+        # Turn the raw bytes into a real Tkinter picture
+        if img_bytes:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).resize((150, 225))
+                photo = ImageTk.PhotoImage(img)
+                img_label = tk.Label(movie_card, image=photo, bg='white')
+                img_label.image = photo # Save the reference so it doesn't vanish
+                img_label.pack(pady=5, padx=5)
+            except:
+                pass
+        
+        # Shorten big titles
+        if len(title) > 22 :
+            display_title = title[:19] + "..."
+        else:
+            display_title = title
+
+        tk.Label(movie_card, text=display_title, font=('Arial', 10, 'bold'), bg='white').pack(pady=(0, 5))
+        
+        # Buttons
+        tk.Button(movie_card, text="See Details", bg='blue', fg='white', command=lambda m=movie: open_details_window(m)).pack(pady=2)
+        tk.Button(movie_card, text="Add Review", bg='black', fg='white', command=lambda m=movie: open_review_window(m)).pack(pady=5)
+        tk.Button(movie_card, text="+ Watchlist", bg='green', fg='white', command=lambda m=movie: add_to_watchlist(m)).pack(pady=2)
+
+        col += 1
+        if col >= max_columns:
+            col = 0
+            row += 1
+
+    # Update the scrollbar
+    scrollable_movie_frame.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
+#----------------------USER PROFILE--------------------------------------
+# GLOBAL PROFILE FRAME CREATION
+profile_frame = tk.Frame(base, bg='white', bd=2)
+
+def load_user_profile():
+    # DELETES EXISTING WIDGETS IN PROFILE FRAME
+    for widget in profile_frame.winfo_children():
+        widget.destroy()
+
+    # DATABASE CONNECTION
+    con = psq.connect(**db_config)
+    cur = con.cursor()
+
+    # FETCH USERDETAILS TABLE-DATA
+    cur.execute("SELECT * FROM userdetails WHERE username=%s",(current_user,))
+    user_data = cur.fetchone() #TUPLE
+
+    # FETCH GENRES FROM TABLE
+    cur.execute("SELECT genre1, genre2, genre3 FROM usergenres WHERE username=%s",(current_user,))
+    genre_data = cur.fetchone() #TUPLE
+    con.close()
+
+    # USERDETAILS VALUES(INDEXING AND ASSIGNING)
+    fullname = user_data[0]
+    age = user_data[1]
+    gender = user_data[2]
+    email = user_data[3]
+    username = user_data[4]
+    password = user_data[5]
+    bio = user_data[6]
+    dob=user_data[7]
+    # GENRES (INDEXING AND ASSIGNING)
+    genre1 = genre_data[0]
+    genre2 = genre_data[1]
+    genre3 = genre_data[2]
+
+    # ---------------- TITLE ----------------
+    tk.Label(profile_frame,text="👤 USER PROFILE",font=('Arial', 24, 'bold'),bg='white',fg='black').pack(pady=20)
+
+    # ---------------- PROFILE FRAME----------------
+    profile_inner = tk.Frame(profile_frame,bg='lightgrey',bd=2,relief='solid',padx=20,pady=20)
+    profile_inner.pack(pady=10, padx=20, fill='both', expand=True)
+
+    # FULL NAME
+    tk.Label(profile_inner,text=f"Full Name : {fullname}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+    
+    # AGE
+    tk.Label(profile_inner,text=f"Age : {age}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # GENDER
+    tk.Label(profile_inner,text=f"Gender : {gender}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # EMAIL
+    tk.Label(profile_inner,text=f"Email : {email}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    #DOB
+    tk.Label(profile_inner,text=f"Date of Birth : {dob}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # USERNAME
+    tk.Label(profile_inner,text=f"Username : {username}",font=('Arial', 14),bg='lightgrey',anchor='w').pack(fill='x', pady=8)
+
+    # PASSWORD (WITH SHOW/HIDE TOGGLE)
+    pass_frame = tk.Frame(profile_inner, bg='lightgrey')
+    pass_frame.pack(fill='x', pady=8)
+    pass_label = tk.Label(pass_frame, text=f"Password : {'*' * len(password)}", font=('Arial', 14), bg='lightgrey', anchor='w')
+    pass_label.pack(side='left')
+
+    def toggle_password():
+        if pass_btn.cget('text') == 'Show Password':
+            pass_label.config(text=f"Password : {password}")
+            pass_btn.config(text='Hide Password')
+        else:
+            pass_label.config(text=f"Password : {'*' * len(password)}")
+            pass_btn.config(text='Show Password')
+
+    pass_btn = tk.Button(pass_frame, text="Show Password", command=toggle_password, bg='black', fg='white', font=('Arial', 10), cursor='hand2')
+    pass_btn.pack(side='left', padx=10)
+
+    # BIO
+    tk.Label(profile_inner,text=f"Bio : {bio}",font=('Arial', 14),bg='lightgrey',anchor='w',wraplength=350,justify='left').pack(fill='x', pady=8)
+
+    # FAVORITE GENRES TITLE
+    tk.Label(profile_inner,text="Favorite Genres",font=('Arial', 16, 'bold'),bg='lightgrey').pack(pady=15)
+
+    # GENRE 1
+    tk.Label(profile_inner,text=f"• {genre1}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+
+    # GENRE 2
+    tk.Label(profile_inner,text=f"• {genre2}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+
+    # GENRE 3
+    tk.Label(profile_inner,text=f"• {genre3}",font=('Arial', 13),bg='lightgrey').pack(pady=2)
+
+    # BACK TO DASHBOARD BUTTON
+    tk.Button(profile_frame,text="Back to Dashboard",font=('Arial', 12, 'bold'),bg='black',fg='white',cursor='hand2',command=show_dashboard_screen).pack(pady=20)
+
+# ---------------- INITIALIZATION ----------------
+init_db()
+show_login_screen()
+base.mainloop()
